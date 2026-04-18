@@ -1,35 +1,55 @@
 module.exports = {
   name: 'interactionCreate',
+
   async execute(interaction, client) {
 
+    // ❌ Ignorar lo que no sea slash command
     if (!interaction.isChatInputCommand()) return;
 
-    console.log(`📩 Comando recibido: ${interaction.commandName}`);
+    const { commandName, user } = interaction;
 
-    const command = client.commands.get(interaction.commandName);
+    console.log(`📩 [${user.tag}] → /${commandName}`);
+
+    const command = client.commands.get(commandName);
+
     if (!command) {
-      console.log('❌ Comando no encontrado');
+      console.warn(`⚠️ Comando no encontrado: ${commandName}`);
       return;
     }
 
-    try {
-      console.log('🚀 Ejecutando...');
-      await command.execute(interaction, client);
-      console.log('✅ Ejecutado');
-    } catch (error) {
-      console.error('💥 Error:', error);
+    const start = Date.now();
 
-      // ⚠️ manejo correcto del reply
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({
-          content: '❌ Error ejecutando el comando',
-          ephemeral: true
-        });
-      } else {
-        await interaction.reply({
-          content: '❌ Error ejecutando el comando',
-          ephemeral: true
-        });
+    try {
+      console.log('🚀 Ejecutando comando...');
+
+      // ⚡ ejecutar comando
+      await command.execute(interaction, client);
+
+      const time = Date.now() - start;
+      console.log(`✅ /${commandName} ejecutado en ${time}ms`);
+
+    } catch (error) {
+      console.error(`💥 Error en /${commandName}:`, error);
+
+      // 🧠 Manejo inteligente de respuestas
+      try {
+        if (interaction.deferred) {
+          await interaction.editReply({
+            content: '❌ Error ejecutando el comando'
+          });
+        } else if (interaction.replied) {
+          await interaction.followUp({
+            content: '❌ Error ejecutando el comando',
+            flags: 64 // 👈 reemplazo moderno de ephemeral
+          });
+        } else {
+          await interaction.reply({
+            content: '❌ Error ejecutando el comando',
+            flags: 64
+          });
+        }
+      } catch (replyError) {
+        console.error('❌ Error enviando respuesta de error:', replyError);
       }
     }
   }

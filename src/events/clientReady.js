@@ -35,10 +35,6 @@ module.exports = {
           type: ActivityType.Watching
         },
         {
-          name: `📺 TikTok`,
-          type: ActivityType.Watching
-        },
-        {
           name: `🎧 /help`,
           type: ActivityType.Listening
         }
