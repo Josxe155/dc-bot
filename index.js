@@ -21,25 +21,40 @@ const client = new Client({
 // =========================
 client.commands = new Map();
 
-const commandsPath = path.join(__dirname, 'src/commands');
-const commandFolders = fs.readdirSync(commandsPath);
+const commandsPath = path.join(__dirname, 'src', 'commands');
 
-for (const folder of commandFolders) {
-  const folderPath = path.join(commandsPath, folder);
-  const commandFiles = fs.readdirSync(folderPath).filter(file => file.endsWith('.js'));
+if (!fs.existsSync(commandsPath)) {
+  console.log('⚠️ No existe la carpeta src/commands');
+} else {
+  const commandFolders = fs.readdirSync(commandsPath);
 
-  for (const file of commandFiles) {
-    const filePath = path.join(folderPath, file);
-    const command = require(filePath);
+  for (const folder of commandFolders) {
+    const folderPath = path.join(commandsPath, folder);
 
-    if (command.data && command.execute) {
-      client.commands.set(command.data.name, command);
+    if (!fs.lstatSync(folderPath).isDirectory()) continue;
+
+    const commandFiles = fs
+      .readdirSync(folderPath)
+      .filter(file => file.endsWith('.js'));
+
+    for (const file of commandFiles) {
+      try {
+        const filePath = path.join(folderPath, file);
+        const command = require(filePath);
+
+        if (command.data && command.execute) {
+          client.commands.set(command.data.name, command);
+        } else {
+          console.log(`⚠️ Comando inválido: ${file}`);
+        }
+      } catch (err) {
+        console.error(`❌ Error cargando comando ${file}:`, err);
+      }
     }
   }
+
+  console.log('📦 Comandos cargados');
 }
-
-console.log('📦 Comandos cargados');
-
 // =========================
 // 🔧 EVENTS
 // =========================
