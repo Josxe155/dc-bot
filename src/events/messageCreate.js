@@ -1,5 +1,6 @@
 const { askNexus } = require('../modules/ai/nexusAI');
 const { textToSpeech } = require('../modules/ai/tts');
+const log = require('../utils/logger');
 const fs = require('fs');
 
 module.exports = {
@@ -7,7 +8,6 @@ module.exports = {
 
   async execute(message, client) {
 
-    // ❌ ignorar bots
     if (message.author.bot) return;
 
     const isDM = !message.guild;
@@ -17,25 +17,34 @@ module.exports = {
     if (!content) return;
 
     // =========================
+    // 📩 LOG GENERAL
+    // =========================
+    await log(client, `📩 ${message.author.tag}: ${content}`);
+
+    // =========================
     // 💬 DM → IA AUTOMÁTICA
     // =========================
     if (isDM) {
-      console.log(`📩 DM [${message.author.tag}]: ${content}`);
-
       try {
         await message.channel.sendTyping();
 
         const wantsAudio = detectAudioRequest(content);
         const reply = await askNexus(message.author.id, content);
 
+        await log(client, `🤖 DM Reply: ${reply}`);
+
         if (wantsAudio) {
-          return sendAudioReply(message, reply);
+          return sendAudioReply(message, reply, client);
         }
 
         await message.reply(reply);
 
       } catch (err) {
         console.error('💥 Error en DM:', err);
+
+        await log(client, `💥 ERROR DM:
+${err.stack || err.message}`);
+
         message.reply('❌ Error con IA');
       }
 
@@ -43,9 +52,12 @@ module.exports = {
     }
 
     // =========================
-    // 🌍 SOLO SERVIDOR NEXUS
+    // 🌍 FILTRO SERVIDOR
     // =========================
-    if (message.guild.id !== NEXUS_GUILD_ID) return;
+    if (message.guild.id !== NEXUS_GUILD_ID) {
+      await log(client, `⛔ Ignorado (otro server): ${message.guild.id}`);
+      return;
+    }
 
     const mention1 = `<@${client.user.id}>`;
     const mention2 = `<@!${client.user.id}>`;
@@ -57,8 +69,10 @@ module.exports = {
     const isDirectCall =
       content.toLowerCase().startsWith('nexus');
 
-    // ❌ si no es mención ni "nexus"
-    if (!isMention && !isDirectCall) return;
+    if (!isMention && !isDirectCall) {
+      await log(client, `❌ No activado`);
+      return;
+    }
 
     // limpiar texto
     content = content
@@ -67,7 +81,7 @@ module.exports = {
       .replace(/^nexus/i, '')
       .trim();
 
-    console.log(`💬 Nexus [${message.author.tag}]: ${content}`);
+    await log(client, `🎯 Activado: ${content}`);
 
     if (!content) {
       return message.reply('👋 ¿Qué necesitas?');
@@ -79,14 +93,20 @@ module.exports = {
       const wantsAudio = detectAudioRequest(content);
       const reply = await askNexus(message.author.id, content);
 
+      await log(client, `🤖 Reply: ${reply}`);
+
       if (wantsAudio) {
-        return sendAudioReply(message, reply);
+        return sendAudioReply(message, reply, client);
       }
 
       await message.reply(reply);
 
     } catch (err) {
       console.error('💥 Error en servidor:', err);
+
+      await log(client, `💥 ERROR SERVER:
+${err.stack || err.message}`);
+
       message.reply('❌ Error con IA');
     }
   }
@@ -110,9 +130,9 @@ function detectAudioRequest(text) {
 }
 
 // =========================
-// 🔊 ENVIAR AUDIO
+// 🔊 AUDIO + LOGS
 // =========================
-async function sendAudioReply(message, text) {
+async function sendAudioReply(message, text, client) {
   try {
     const fileName = `voice-${Date.now()}.mp3`;
     const filePath = await textToSpeech(text, fileName);
@@ -122,13 +142,18 @@ async function sendAudioReply(message, text) {
       files: [filePath]
     });
 
-    // 🧹 borrar archivo después
+    await log(client, `🔊 Audio enviado`);
+
     setTimeout(() => {
       fs.unlink(filePath, () => {});
     }, 5000);
 
   } catch (err) {
     console.error('💥 Error TTS:', err);
+
+    await log(client, `💥 ERROR TTS:
+${err.stack || err.message}`);
+
     await message.reply(text);
   }
 }
