@@ -13,21 +13,19 @@ module.exports = {
     const isDM = !message.guild;
     const NEXUS_GUILD_ID = process.env.NEXUS_GUILD_ID;
 
-    let content = message.content.trim();
+    let content = message.content?.trim();
+    if (!content) return;
 
     // =========================
     // 💬 DM → IA AUTOMÁTICA
     // =========================
     if (isDM) {
-
       console.log(`📩 DM [${message.author.tag}]: ${content}`);
-      if (!content) return;
 
       try {
         await message.channel.sendTyping();
 
         const wantsAudio = detectAudioRequest(content);
-
         const reply = await askNexus(message.author.id, content);
 
         if (wantsAudio) {
@@ -45,16 +43,28 @@ module.exports = {
     }
 
     // =========================
-    // 🌍 SERVIDOR NEXUS
+    // 🌍 SOLO SERVIDOR NEXUS
     // =========================
     if (message.guild.id !== NEXUS_GUILD_ID) return;
 
-    if (!message.mentions.has(client.user)) return;
+    const mention1 = `<@${client.user.id}>`;
+    const mention2 = `<@!${client.user.id}>`;
 
-    // limpiar mención
+    const isMention =
+      content.includes(mention1) ||
+      content.includes(mention2);
+
+    const isDirectCall =
+      content.toLowerCase().startsWith('nexus');
+
+    // ❌ si no es mención ni "nexus"
+    if (!isMention && !isDirectCall) return;
+
+    // limpiar texto
     content = content
-      .replace(`<@${client.user.id}>`, '')
-      .replace(`<@!${client.user.id}>`, '')
+      .replace(mention1, '')
+      .replace(mention2, '')
+      .replace(/^nexus/i, '')
       .trim();
 
     console.log(`💬 Nexus [${message.author.tag}]: ${content}`);
@@ -67,7 +77,6 @@ module.exports = {
       await message.channel.sendTyping();
 
       const wantsAudio = detectAudioRequest(content);
-
       const reply = await askNexus(message.author.id, content);
 
       if (wantsAudio) {
@@ -105,15 +114,18 @@ function detectAudioRequest(text) {
 // =========================
 async function sendAudioReply(message, text) {
   try {
-    const filePath = await textToSpeech(text, `voice-${Date.now()}.mp3`);
+    const fileName = `voice-${Date.now()}.mp3`;
+    const filePath = await textToSpeech(text, fileName);
 
     await message.reply({
       content: '🔊 Respuesta en audio:',
       files: [filePath]
     });
 
-    // 🧹 borrar archivo
-    fs.unlink(filePath, () => {});
+    // 🧹 borrar archivo después
+    setTimeout(() => {
+      fs.unlink(filePath, () => {});
+    }, 5000);
 
   } catch (err) {
     console.error('💥 Error TTS:', err);
