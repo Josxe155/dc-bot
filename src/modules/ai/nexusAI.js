@@ -1,97 +1,115 @@
-const { Groq } = require('groq-sdk');
-
-const softLimit = require('../limits/softLimit'); 
+const Groq = require("groq-sdk");
+const softLimit = require("../limits/softLimit");
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-// 🧠 Modelo principal
 const MODEL = "llama-3.3-70b-versatile";
 
-// 🎭 Personalidad del sistema
+// 🎭 PERSONALIDAD MEJORADA PARA VOZ
 const SYSTEM_PROMPT = `
-Eres Nexus, una inteligencia artificial integrada en un bot de Discord.
+Eres Nexus, una inteligencia artificial en Discord.
 
 Reglas:
-- Responde en español claro y natural
-- Sé directo y útil
-- No inventes datos
-- No seas excesivamente largo
-- Usa emojis moderadamente
-- Si no sabes algo, dilo claramente
+- Responde en español natural y conversacional
+- Frases cortas (ideal para voz)
+- No uses markdown ni formato extraño
+- No uses listas largas
+- Sé claro, útil y directo
+- Usa emojis solo si aportan emoción
+- Si no sabes algo, dilo honestamente
 `;
 
 // ================================
-// 🧠 MEMORIA LOCAL SIMPLE
+// 🧠 MEMORIA
 // ================================
 const memory = new Map();
 
-async function getMemory(userId) {
+function getMemory(userId) {
   return memory.get(userId) || [];
 }
 
-async function saveMemory(userId, messages) {
-  memory.set(userId, messages.slice(-10)); // límite simple
-}
+function saveMemory(userId, messages) {
+  const clean = messages
+    .filter(m => m && m.content)
+    .slice(-12);
 
-async function saveMemory(userId, messages) {
-  const limited = messages.slice(-12);
-
-  try {
-    if (firestore?.saveMessage) {
-      const last = limited[limited.length - 1];
-      if (last) await firestore.saveMessage(userId, last);
-      return;
-    }
-  } catch (e) {
-    console.warn("Firestore no disponible, usando memoria local");
-  }
-
-  memory.set(userId, limited);
+  memory.set(userId, clean);
 }
 
 // ================================
-// 🤖 FUNCIÓN PRINCIPAL IA
+// 🔊 LIMPIAR TEXTO PARA VOZ
+// ================================
+function cleanForSpeech(text) {
+  return text
+    .replace(/\*/g, "")
+    .replace(/`/g, "")
+    .replace(/#/g, "")
+    .replace(/[_~]/g, "")
+    .replace(/\n/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// ================================
+// 🤖 FUNCIÓN PRINCIPAL
 // ================================
 async function askNexus(userId, userMessage) {
   try {
-    // 🧠 obtener historial
-    const history = await getMemory(userId);
+    const limitState = softLimit.check(userId);
 
-    // construir mensajes
+    if (limitState.blocked) {
+      return "Has alcanzado el límite temporal, intenta más tarde.";
+    }
+
+    const history = getMemory(userId);
+
+    const safeHistory = history.slice(-10);
+
     const messages = [
       { role: "system", content: SYSTEM_PROMPT },
-      ...history,
+      ...safeHistory,
       { role: "user", content: userMessage }
     ];
 
-    // ⚡ llamada a Groq
     const response = await groq.chat.completions.create({
       model: MODEL,
       messages,
       temperature: 0.7,
-      max_tokens: 500
+      max_tokens: limitState.reduced ? 150 : 350
     });
 
-    const text =
+    let text =
       response?.choices?.[0]?.message?.content?.trim()
-      || "No se pudo generar respuesta.";
+      || "No pude generar respuesta.";
 
-    // 🧠 actualizar memoria
-    const updatedHistory = [
-      ...history,
+    // ⚠️ límite Discord
+    if (text.length > 1900) {
+      text = text.slice(0, 1900) + "…";
+    }
+
+    // 🔊 preparar versión voz
+    const speechText = cleanForSpeech(text);
+
+    // 🧠 guardar memoria
+    saveMemory(userId, [
+      ...safeHistory,
       { role: "user", content: userMessage },
       { role: "assistant", content: text }
-    ];
+    ]);
 
-    await saveMemory(userId, updatedHistory);
-
-    return text;
+    return {
+      text,
+      speechText // 👈 IMPORTANTE para gTTS
+    };
 
   } catch (error) {
     console.error("❌ NEXUS AI ERROR:", error);
-    return "❌ Error interno del sistema de IA.";
+    return {
+      text: "Error interno del sistema de IA.",
+      speechText: "Error interno del sistema."
+    };
   }
 }
 
