@@ -7,7 +7,7 @@ module.exports = {
   name: 'messageCreate',
 
   async execute(message, client) {
-
+    // ❌ ignorar bots
     if (message.author.bot) return;
 
     const isDM = !message.guild;
@@ -17,11 +17,6 @@ module.exports = {
     if (!content) return;
 
     // =========================
-    // 📩 LOG GENERAL
-    // =========================
-    await log(client, `📩 ${message.author.tag}: ${content}`);
-
-    // =========================
     // 💬 DM → IA AUTOMÁTICA
     // =========================
     if (isDM) {
@@ -29,50 +24,42 @@ module.exports = {
         await message.channel.sendTyping();
 
         const wantsAudio = detectAudioRequest(content);
-        const reply = await askNexus(message.author.id, content);
+        const ai = await askNexus(message.author.id, content);
 
-        await log(client, `🤖 DM Reply: ${reply}`);
+        const safeText = normalizeText(ai?.text);
 
         if (wantsAudio) {
-          return sendAudioReply(message, reply, client);
+          return sendAudioReply(message, ai?.speechText || safeText);
         }
 
-        await message.reply(reply);
+        return message.reply(safeText);
 
       } catch (err) {
         console.error('💥 Error en DM:', err);
-
-        await log(client, `💥 ERROR DM:
-${err.stack || err.message}`);
-
-        message.reply('❌ Error con IA');
+        await safeLog(client, `💥 ERROR DM:\n${err.stack || err.message}`);
+        return message.reply('❌ Error con IA');
       }
-
-      return;
     }
 
     // =========================
-    // 🌍 FILTRO SERVIDOR
+    // 🌍 SOLO SERVIDOR NEXUS
     // =========================
-    if (message.guild.id !== NEXUS_GUILD_ID) {
-      await log(client, `⛔ Ignorado (otro server): ${message.guild.id}`);
-      return;
-    }
+    if (!message.guild || message.guild.id !== NEXUS_GUILD_ID) return;
 
     const mention1 = `<@${client.user.id}>`;
     const mention2 = `<@!${client.user.id}>`;
+
+    const lower = content.toLowerCase();
 
     const isMention =
       content.includes(mention1) ||
       content.includes(mention2);
 
     const isDirectCall =
-      content.toLowerCase().startsWith('nexus');
+      lower.startsWith('nexus');
 
-    if (!isMention && !isDirectCall) {
-      await log(client, `❌ No activado`);
-      return;
-    }
+    // ❌ si no es mención ni "nexus"
+    if (!isMention && !isDirectCall) return;
 
     // limpiar texto
     content = content
@@ -80,8 +67,6 @@ ${err.stack || err.message}`);
       .replace(mention2, '')
       .replace(/^nexus/i, '')
       .trim();
-
-    await log(client, `🎯 Activado: ${content}`);
 
     if (!content) {
       return message.reply('👋 ¿Qué necesitas?');
@@ -91,26 +76,24 @@ ${err.stack || err.message}`);
       await message.channel.sendTyping();
 
       const wantsAudio = detectAudioRequest(content);
-      const reply = await askNexus(message.author.id, content);
+      const ai = await askNexus(message.author.id, content);
 
-      await log(client, `🤖 Reply: ${reply}`);
+      const safeText = normalizeText(ai?.text);
 
       if (wantsAudio) {
-        return sendAudioReply(message, reply, client);
+        return sendAudioReply(message, ai?.speechText || safeText);
       }
 
-      await message.reply(reply);
+      return message.reply(safeText);
 
     } catch (err) {
       console.error('💥 Error en servidor:', err);
-
-      await log(client, `💥 ERROR SERVER:
-${err.stack || err.message}`);
-
-      message.reply('❌ Error con IA');
+      await safeLog(client, `💥 ERROR SERVER:\n${err.stack || err.message}`);
+      return message.reply('❌ Error con IA');
     }
   }
 };
+
 
 // =========================
 // 🧠 DETECTOR DE AUDIO
@@ -129,31 +112,62 @@ function detectAudioRequest(text) {
   return triggers.some(t => lower.includes(t));
 }
 
+
 // =========================
-// 🔊 AUDIO + LOGS
+// 🧼 NORMALIZAR TEXTO
 // =========================
-async function sendAudioReply(message, text, client) {
+function normalizeText(text) {
+  if (!text || typeof text !== 'string') {
+    return '🤖 No tengo respuesta ahora mismo.';
+  }
+
+  const clean = text.trim();
+
+  if (clean.length === 0) {
+    return '🤖 No tengo respuesta ahora mismo.';
+  }
+
+  // límite Discord
+  return clean.length > 1900
+    ? clean.slice(0, 1900) + '…'
+    : clean;
+}
+
+
+// =========================
+// 🔊 AUDIO
+// =========================
+async function sendAudioReply(message, text) {
   try {
+    const safe = normalizeText(text);
+
     const fileName = `voice-${Date.now()}.mp3`;
-    const filePath = await textToSpeech(text, fileName);
+    const filePath = await textToSpeech(safe, fileName);
 
     await message.reply({
       content: '🔊 Respuesta en audio:',
       files: [filePath]
     });
 
-    await log(client, `🔊 Audio enviado`);
-
+    // 🧹 limpiar archivo
     setTimeout(() => {
       fs.unlink(filePath, () => {});
     }, 5000);
 
   } catch (err) {
     console.error('💥 Error TTS:', err);
+    return message.reply(normalizeText(text));
+  }
+}
 
-    await log(client, `💥 ERROR TTS:
-${err.stack || err.message}`);
 
-    await message.reply(text);
+// =========================
+// 📡 LOG SEGURO (solo errores)
+// =========================
+async function safeLog(client, msg) {
+  try {
+    if (!process.env.LOG_CHANNEL_ID) return;
+    await log(client, msg);
+  } catch {
   }
 }
