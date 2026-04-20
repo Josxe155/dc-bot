@@ -176,4 +176,10 @@ client.on('error', (err) => {
 
 client.on('warn', (warn) => {
   console.warn('⚠️ Discord Warning:', warn);
+  
+  console.log({
+  project: process.env.FIREBASE_PROJECT_ID,
+  email: process.env.FIREBASE_CLIENT_EMAIL,
+  key: process.env.FIREBASE_PRIVATE_KEY ? "OK" : "MISSING"
+});
 });
