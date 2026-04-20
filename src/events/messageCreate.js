@@ -7,6 +7,7 @@ module.exports = {
   name: 'messageCreate',
 
   async execute(message, client) {
+
     // ❌ ignorar bots
     if (message.author.bot) return;
 
@@ -56,17 +57,38 @@ module.exports = {
       content.includes(mention2);
 
     const isDirectCall =
-      lower.startsWith('nexus');
+      lower.startsWith('nexus ') || lower === 'nexus';
 
-    // ❌ si no es mención ni "nexus"
-    if (!isMention && !isDirectCall) return;
+    // =========================
+    // 🔥 DETECTAR REPLY AL BOT
+    // =========================
+    let isReplyToBot = false;
 
-    // limpiar texto
-    content = content
-      .replace(mention1, '')
-      .replace(mention2, '')
-      .replace(/^nexus/i, '')
-      .trim();
+    if (message.reference?.messageId) {
+      try {
+        const referenced = await message.channel.messages.fetch(message.reference.messageId);
+
+        if (referenced.author.id === client.user.id) {
+          isReplyToBot = true;
+        }
+      } catch (err) {
+        console.error('Error leyendo reply:', err);
+      }
+    }
+
+    // ❌ si no cumple nada → ignorar
+    if (!isMention && !isDirectCall && !isReplyToBot) return;
+
+    // =========================
+    // 🧼 LIMPIAR TEXTO
+    // =========================
+    if (!isReplyToBot) {
+      content = content
+        .replace(mention1, '')
+        .replace(mention2, '')
+        .replace(/^nexus/i, '')
+        .trim();
+    }
 
     if (!content) {
       return message.reply('👋 ¿Qué necesitas?');
@@ -94,7 +116,6 @@ module.exports = {
   }
 };
 
-
 // =========================
 // 🧠 DETECTOR DE AUDIO
 // =========================
@@ -112,7 +133,6 @@ function detectAudioRequest(text) {
   return triggers.some(t => lower.includes(t));
 }
 
-
 // =========================
 // 🧼 NORMALIZAR TEXTO
 // =========================
@@ -127,12 +147,10 @@ function normalizeText(text) {
     return '🤖 No tengo respuesta ahora mismo.';
   }
 
-  // límite Discord
   return clean.length > 1900
     ? clean.slice(0, 1900) + '…'
     : clean;
 }
-
 
 // =========================
 // 🔊 AUDIO
@@ -160,14 +178,12 @@ async function sendAudioReply(message, text) {
   }
 }
 
-
 // =========================
-// 📡 LOG SEGURO (solo errores)
+// 📡 LOG SOLO ERRORES
 // =========================
 async function safeLog(client, msg) {
   try {
     if (!process.env.LOG_CHANNEL_ID) return;
     await log(client, msg);
-  } catch {
-  }
+  } catch {}
 }
