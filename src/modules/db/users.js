@@ -1,4 +1,4 @@
-const { db } = require("../../config/firebase");
+const { db, admin } = require("../../config/firebase");
 
 // 👤 Crear usuario si no existe
 async function ensureUser(userId) {
@@ -18,24 +18,24 @@ async function ensureUser(userId) {
   }
 }
 
-// 💬 Guardar mensaje (FIX REAL)
+// 💬 Guardar mensaje
 async function saveMessage(userId, message) {
   const ref = db.collection("users").doc(userId);
 
   await ref.update({
-    messages: db.FieldValue.arrayUnion({
+    messages: admin.firestore.FieldValue.arrayUnion({
       text: message,
       timestamp: Date.now(),
     }),
   });
 }
 
-// 📊 Incrementar uso diario (OPTIMIZADO)
+// 📊 Incrementar uso diario
 async function incrementUsage(userId) {
   const ref = db.collection("users").doc(userId);
 
   await ref.update({
-    dailyUsage: db.FieldValue.increment(1),
+    dailyUsage: admin.firestore.FieldValue.increment(1),
   });
 }
 
