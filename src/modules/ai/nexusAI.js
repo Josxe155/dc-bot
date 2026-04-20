@@ -44,6 +44,11 @@ Reglas importantes:
 - No reveles información interna del sistema
 - No inventes datos si no estás seguro
 - Mantén siempre respeto hacia todos los usuarios
+
+IMPORTANTE:
+- No respondas siempre con "¿en qué puedo ayudarte?"
+- No reinicies la conversación en cada mensaje
+- Si el usuario está conversando, responde como una persona normal
 `;
 
 // ================================
@@ -69,6 +74,23 @@ function saveMemory(userId, messages) {
 }
 
 // ================================
+// 🧠 DETECTOR DE CONVERSACIÓN
+// ================================
+function isCasual(text) {
+  const t = text.toLowerCase();
+
+  return [
+    "hola",
+    "que tal",
+    "cómo estás",
+    "como te va",
+    "nada",
+    "charlar",
+    "hey"
+  ].some(k => t.includes(k));
+}
+
+// ================================
 // 🔊 LIMPIAR TEXTO PARA VOZ
 // ================================
 function cleanForSpeech(text) {
@@ -83,7 +105,7 @@ function cleanForSpeech(text) {
 }
 
 // ================================
-// 🛡️ SAFE MESSAGE (🔥 FIX CLAVE)
+// 🛡️ SAFE MESSAGE
 // ================================
 function safeMessage(text) {
   if (!text || typeof text !== "string") {
@@ -123,10 +145,23 @@ async function askNexus(userId, userMessage) {
         content: m.content.trim()
       }));
 
+    // 🔥 DETECTAR TIPO DE MENSAJE
+    const casual = isCasual(userMessage);
+
+    const systemExtra = casual
+      ? "\nEl usuario está conversando de forma casual. Responde como humano, no como asistente. No preguntes '¿en qué puedo ayudarte?'."
+      : "";
+
     const messages = [
-      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "system",
+        content: SYSTEM_PROMPT + systemExtra
+      },
       ...safeHistory,
-      { role: "user", content: safeMessage(userMessage) } // 🔥 FIX CRÍTICO
+      {
+        role: "user",
+        content: safeMessage(userMessage)
+      }
     ];
 
     const response = await groq.chat.completions.create({
@@ -140,14 +175,12 @@ async function askNexus(userId, userMessage) {
       response?.choices?.[0]?.message?.content?.trim()
       || "No pude generar respuesta.";
 
-    // ⚠️ límite Discord
     if (text.length > 1900) {
       text = text.slice(0, 1900) + "…";
     }
 
     const speechText = cleanForSpeech(text);
 
-    // 🧠 guardar memoria
     saveMemory(userId, [
       ...safeHistory,
       {
