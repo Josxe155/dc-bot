@@ -3,12 +3,18 @@ const { textToSpeech } = require('../modules/ai/tts');
 const log = require('../utils/logger');
 const fs = require('fs');
 
+// 🧠 FIRESTORE
+const {
+  ensureUser,
+  saveMessage,
+  incrementUsage
+} = require('../modules/db/users');
+
 module.exports = {
   name: 'messageCreate',
 
   async execute(message, client) {
 
-    // ❌ ignorar bots
     if (message.author.bot) return;
 
     const isDM = !message.guild;
@@ -16,6 +22,19 @@ module.exports = {
 
     let content = message.content?.trim();
     if (!content) return;
+
+    const userId = message.author.id;
+
+    // =========================
+    // ☁️ FIRESTORE BASE (SIEMPRE)
+    // =========================
+    try {
+      await ensureUser(userId);
+      await saveMessage(userId, content);
+      await incrementUsage(userId);
+    } catch (err) {
+      console.error('🔥 Firestore error:', err);
+    }
 
     // =========================
     // 💬 DM → IA AUTOMÁTICA
@@ -25,7 +44,7 @@ module.exports = {
         await message.channel.sendTyping();
 
         const wantsAudio = detectAudioRequest(content);
-        const ai = await askNexus(message.author.id, content);
+        const ai = await askNexus(userId, content);
 
         const safeText = normalizeText(ai?.text);
 
@@ -59,9 +78,6 @@ module.exports = {
     const isDirectCall =
       lower.startsWith('nexus ') || lower === 'nexus';
 
-    // =========================
-    // 🔥 DETECTAR REPLY AL BOT
-    // =========================
     let isReplyToBot = false;
 
     if (message.reference?.messageId) {
@@ -76,12 +92,8 @@ module.exports = {
       }
     }
 
-    // ❌ si no cumple nada → ignorar
     if (!isMention && !isDirectCall && !isReplyToBot) return;
 
-    // =========================
-    // 🧼 LIMPIAR TEXTO
-    // =========================
     if (!isReplyToBot) {
       content = content
         .replace(mention1, '')
@@ -98,7 +110,7 @@ module.exports = {
       await message.channel.sendTyping();
 
       const wantsAudio = detectAudioRequest(content);
-      const ai = await askNexus(message.author.id, content);
+      const ai = await askNexus(userId, content);
 
       const safeText = normalizeText(ai?.text);
 
@@ -117,7 +129,7 @@ module.exports = {
 };
 
 // =========================
-// 🧠 DETECTOR DE AUDIO
+// 🧠 DETECTOR AUDIO
 // =========================
 function detectAudioRequest(text) {
   const triggers = [
@@ -167,7 +179,6 @@ async function sendAudioReply(message, text) {
       files: [filePath]
     });
 
-    // 🧹 limpiar archivo
     setTimeout(() => {
       fs.unlink(filePath, () => {});
     }, 5000);
@@ -179,7 +190,7 @@ async function sendAudioReply(message, text) {
 }
 
 // =========================
-// 📡 LOG SOLO ERRORES
+// 📡 LOG SEGURO
 // =========================
 async function safeLog(client, msg) {
   try {
