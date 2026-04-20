@@ -66,14 +66,7 @@ module.exports = {
     // =========================
     if (!message.guild || message.guild.id !== NEXUS_GUILD_ID) return;
 
-    const mention1 = `<@${client.user.id}>`;
-    const mention2 = `<@!${client.user.id}>`;
-
-    const lower = content.toLowerCase();
-
-    const isMention =
-      content.includes(mention1) ||
-      content.includes(mention2);
+ const isMention = message.mentions.has(client.user.id);
 
     const isDirectCall =
       lower.startsWith('nexus ') || lower === 'nexus';
