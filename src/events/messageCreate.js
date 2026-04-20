@@ -25,8 +25,10 @@ module.exports = {
 
     const userId = message.author.id;
 
+    const lower = content.toLowerCase();
+
     // =========================
-    // ☁️ FIRESTORE BASE (SIEMPRE)
+    // ☁️ FIRESTORE (SIEMPRE)
     // =========================
     try {
       await ensureUser(userId);
@@ -37,89 +39,74 @@ module.exports = {
     }
 
     // =========================
-    // 💬 DM → IA AUTOMÁTICA
+    // 💬 DM → IA
     // =========================
     if (isDM) {
-      try {
-        await message.channel.sendTyping();
-
-        const wantsAudio = detectAudioRequest(content);
-        const ai = await askNexus(userId, content);
-
-        const safeText = normalizeText(ai?.text);
-
-        if (wantsAudio) {
-          return sendAudioReply(message, ai?.speechText || safeText);
-        }
-
-        return message.reply(safeText);
-
-      } catch (err) {
-        console.error('💥 Error en DM:', err);
-        await safeLog(client, `💥 ERROR DM:\n${err.stack || err.message}`);
-        return message.reply('❌ Error con IA');
-      }
+      return handleAI(message, client, userId, content);
     }
 
     // =========================
     // 🌍 SOLO SERVIDOR NEXUS
     // =========================
-    if (!message.guild || message.guild.id !== NEXUS_GUILD_ID) return;
+    if (message.guild.id !== NEXUS_GUILD_ID) return;
 
- const isMention = message.mentions.has(client.user.id);
+    // 🔥 MENCIONES ROBUSTAS (FIX REAL)
+    const isMention = message.mentions.has(client.user.id);
 
     const isDirectCall =
       lower.startsWith('nexus ') || lower === 'nexus';
 
+    // 🔥 REPLY CHECK
     let isReplyToBot = false;
 
     if (message.reference?.messageId) {
       try {
-        const referenced = await message.channel.messages.fetch(message.reference.messageId);
-
-        if (referenced.author.id === client.user.id) {
-          isReplyToBot = true;
-        }
-      } catch (err) {
-        console.error('Error leyendo reply:', err);
-      }
+        const ref = await message.channel.messages.fetch(message.reference.messageId);
+        isReplyToBot = ref.author.id === client.user.id;
+      } catch {}
     }
 
+    // ❌ ignorar si no activa nada
     if (!isMention && !isDirectCall && !isReplyToBot) return;
 
+    // 🧼 limpiar input correctamente
     if (!isReplyToBot) {
       content = content
-        .replace(mention1, '')
-        .replace(mention2, '')
+        .replace(/<@!?(\d+)>/g, '') // 🔥 FIX UNIVERSAL MENCIONES
         .replace(/^nexus/i, '')
         .trim();
     }
 
-    if (!content) {
-      return message.reply('👋 ¿Qué necesitas?');
-    }
+    if (!content) return message.reply('👋 ¿Qué necesitas?');
 
-    try {
-      await message.channel.sendTyping();
-
-      const wantsAudio = detectAudioRequest(content);
-      const ai = await askNexus(userId, content);
-
-      const safeText = normalizeText(ai?.text);
-
-      if (wantsAudio) {
-        return sendAudioReply(message, ai?.speechText || safeText);
-      }
-
-      return message.reply(safeText);
-
-    } catch (err) {
-      console.error('💥 Error en servidor:', err);
-      await safeLog(client, `💥 ERROR SERVER:\n${err.stack || err.message}`);
-      return message.reply('❌ Error con IA');
-    }
+    return handleAI(message, client, userId, content);
   }
 };
+
+// =========================
+// 🧠 IA CORE (REUTILIZABLE)
+// =========================
+async function handleAI(message, client, userId, content) {
+  try {
+    await message.channel.sendTyping();
+
+    const wantsAudio = detectAudioRequest(content);
+    const ai = await askNexus(userId, content);
+
+    const safeText = normalizeText(ai?.text);
+
+    if (wantsAudio) {
+      return sendAudioReply(message, ai?.speechText || safeText);
+    }
+
+    return message.reply(safeText);
+
+  } catch (err) {
+    console.error('💥 AI ERROR:', err);
+    await safeLog(client, `💥 ERROR AI:\n${err.stack || err.message}`);
+    return message.reply('❌ Error con IA');
+  }
+}
 
 // =========================
 // 🧠 DETECTOR AUDIO
@@ -148,10 +135,6 @@ function normalizeText(text) {
 
   const clean = text.trim();
 
-  if (clean.length === 0) {
-    return '🤖 No tengo respuesta ahora mismo.';
-  }
-
   return clean.length > 1900
     ? clean.slice(0, 1900) + '…'
     : clean;
@@ -177,7 +160,7 @@ async function sendAudioReply(message, text) {
     }, 5000);
 
   } catch (err) {
-    console.error('💥 Error TTS:', err);
+    console.error('💥 TTS ERROR:', err);
     return message.reply(normalizeText(text));
   }
 }
