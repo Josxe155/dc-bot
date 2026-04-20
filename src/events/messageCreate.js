@@ -3,12 +3,8 @@ const { textToSpeech } = require('../modules/ai/tts');
 const log = require('../utils/logger');
 const fs = require('fs');
 
-// 🧠 FIRESTORE
-const {
-  ensureUser,
-  saveMessage,
-  incrementUsage
-} = require('../modules/db/users');
+// 🧠 FIREBASE RTDB MEMORY (FASE 6)
+const memory = require('../modules/memory/firebaseMemory');
 
 module.exports = {
   name: 'messageCreate',
@@ -24,25 +20,33 @@ module.exports = {
     if (!content) return;
 
     const userId = message.author.id;
-
     const lower = content.toLowerCase();
 
     // =========================
-    // ☁️ FIRESTORE (SIEMPRE)
+    // 🧠 FIREBASE MEMORY (FASE 6)
     // =========================
+    let userData;
     try {
-      await ensureUser(userId);
-      await saveMessage(userId, content);
-      await incrementUsage(userId);
+      userData = await memory.getUser(userId);
+
+      if (!userData) {
+        await memory.createUser(message.author);
+        userData = await memory.getUser(userId);
+      }
+
+      await memory.pushMessage(userId, content);
+      await memory.addXP(userId, 5);
+      await memory.updateLastSeen(userId);
+
     } catch (err) {
-      console.error('🔥 Firestore error:', err);
+      console.error('🔥 Firebase Memory error:', err);
     }
 
     // =========================
     // 💬 DM → IA
     // =========================
     if (isDM) {
-      return handleAI(message, client, userId, content);
+      return handleAI(message, client, userId, content, userData);
     }
 
     // =========================
@@ -50,13 +54,11 @@ module.exports = {
     // =========================
     if (message.guild.id !== NEXUS_GUILD_ID) return;
 
-    // 🔥 MENCIONES ROBUSTAS (FIX REAL)
     const isMention = message.mentions.has(client.user.id);
 
     const isDirectCall =
       lower.startsWith('nexus ') || lower === 'nexus';
 
-    // 🔥 REPLY CHECK
     let isReplyToBot = false;
 
     if (message.reference?.messageId) {
@@ -66,32 +68,40 @@ module.exports = {
       } catch {}
     }
 
-    // ❌ ignorar si no activa nada
     if (!isMention && !isDirectCall && !isReplyToBot) return;
 
-    // 🧼 limpiar input correctamente
     if (!isReplyToBot) {
       content = content
-        .replace(/<@!?(\d+)>/g, '') // 🔥 FIX UNIVERSAL MENCIONES
+        .replace(/<@!?(\d+)>/g, '')
         .replace(/^nexus/i, '')
         .trim();
     }
 
     if (!content) return message.reply('👋 ¿Qué necesitas?');
 
-    return handleAI(message, client, userId, content);
+    return handleAI(message, client, userId, content, userData);
   }
 };
 
 // =========================
-// 🧠 IA CORE (REUTILIZABLE)
+// 🧠 IA CORE (CON MEMORIA)
 // =========================
-async function handleAI(message, client, userId, content) {
+async function handleAI(message, client, userId, content, userData) {
   try {
     await message.channel.sendTyping();
 
     const wantsAudio = detectAudioRequest(content);
-    const ai = await askNexus(userId, content);
+
+    // 🧠 MEMORIA REAL (FASE 6 CORE)
+    const history = userData?.memory?.recentMessages || [];
+    const profile = userData?.profile || {};
+
+    const ai = await askNexus({
+      userId,
+      message: content,
+      history,
+      profile
+    });
 
     const safeText = normalizeText(ai?.text);
 
