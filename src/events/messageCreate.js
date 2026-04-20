@@ -23,7 +23,7 @@ module.exports = {
     const lower = content.toLowerCase();
 
     // =========================
-    // 🧠 FIREBASE MEMORY (FASE 6)
+    // 🧠 FIREBASE MEMORY
     // =========================
     let userData;
     try {
@@ -34,7 +34,9 @@ module.exports = {
         userData = await memory.getUser(userId);
       }
 
-      await memory.pushMessage(userId, content);
+      // 🔥 GUARDAR MENSAJE USER CON ROLE
+      await memory.pushMessage(userId, content, "user");
+
       await memory.addXP(userId, 5);
       await memory.updateLastSeen(userId);
 
@@ -46,7 +48,7 @@ module.exports = {
     // 💬 DM → IA
     // =========================
     if (isDM) {
-      return handleAI(message, client, userId, content, userData);
+      return handleAI(message, client, userId, content);
     }
 
     // =========================
@@ -79,37 +81,39 @@ module.exports = {
 
     if (!content) return message.reply('👋 ¿Qué necesitas?');
 
-    return handleAI(message, client, userId, content, userData);
+    return handleAI(message, client, userId, content);
   }
 };
 
 // =========================
-// 🧠 IA CORE (CON MEMORIA)
+// 🧠 IA CORE
 // =========================
-async function handleAI(message, client, userId, content, userData) {
+async function handleAI(message, client, userId, content) {
   try {
     await message.channel.sendTyping();
 
     const wantsAudio = detectAudioRequest(content);
 
-    // 🧠 MEMORIA REAL (FASE 6 CORE)
-    const history = userData?.memory?.recentMessages || [];
-    const profile = userData?.profile || {};
-
-    const ai = await askNexus({
-      userId,
-      message: content,
-      history,
-      profile
-    });
+    // 🔥 FIX PRINCIPAL → llamada correcta
+    const ai = await askNexus(userId, content);
 
     const safeText = normalizeText(ai?.text);
 
     if (wantsAudio) {
-      return sendAudioReply(message, ai?.speechText || safeText);
+      await sendAudioReply(message, ai?.speechText || safeText);
+
+      // 🔥 guardar respuesta IA
+      await memory.pushMessage(userId, safeText, "assistant");
+
+      return;
     }
 
-    return message.reply(safeText);
+    const reply = await message.reply(safeText);
+
+    // 🔥 guardar respuesta IA
+    await memory.pushMessage(userId, safeText, "assistant");
+
+    return reply;
 
   } catch (err) {
     console.error('💥 AI ERROR:', err);
