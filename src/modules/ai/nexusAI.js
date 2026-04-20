@@ -7,7 +7,7 @@ const groq = new Groq({
 
 const MODEL = "llama-3.3-70b-versatile";
 
-// 🎭 PERSONALIDAD
+// 🎭 PERSONALIDAD (NO TOCADA)
 const SYSTEM_PROMPT = `
 Eres Nexus, una inteligencia artificial dentro de Discord.
 
@@ -45,6 +45,7 @@ Reglas importantes:
 - No inventes datos si no estás seguro
 - Mantén siempre respeto hacia todos los usuarios
 `;
+
 // ================================
 // 🧠 MEMORIA
 // ================================
@@ -56,7 +57,12 @@ function getMemory(userId) {
 
 function saveMemory(userId, messages) {
   const clean = messages
-    .filter(m => m && m.content)
+    .filter(m =>
+      m &&
+      typeof m.role === "string" &&
+      typeof m.content === "string" &&
+      m.content.trim().length > 0
+    )
     .slice(-12);
 
   memory.set(userId, clean);
@@ -66,7 +72,7 @@ function saveMemory(userId, messages) {
 // 🔊 LIMPIAR TEXTO PARA VOZ
 // ================================
 function cleanForSpeech(text) {
-  return text
+  return (text || "")
     .replace(/\*/g, "")
     .replace(/`/g, "")
     .replace(/#/g, "")
@@ -77,6 +83,18 @@ function cleanForSpeech(text) {
 }
 
 // ================================
+// 🛡️ SAFE MESSAGE (🔥 FIX CLAVE)
+// ================================
+function safeMessage(text) {
+  if (!text || typeof text !== "string") {
+    return "Hola";
+  }
+
+  const clean = text.trim();
+  return clean.length > 0 ? clean : "Hola";
+}
+
+// ================================
 // 🤖 FUNCIÓN PRINCIPAL
 // ================================
 async function askNexus(userId, userMessage) {
@@ -84,17 +102,31 @@ async function askNexus(userId, userMessage) {
     const limitState = softLimit.check(userId);
 
     if (limitState.blocked) {
-      return "Has alcanzado el límite temporal, intenta más tarde.";
+      return {
+        text: "Has alcanzado el límite temporal, intenta más tarde.",
+        speechText: "Has alcanzado el límite temporal."
+      };
     }
 
     const history = getMemory(userId);
 
-    const safeHistory = history.slice(-10);
+    const safeHistory = history
+      .slice(-10)
+      .filter(m =>
+        m &&
+        typeof m.role === "string" &&
+        typeof m.content === "string" &&
+        m.content.trim().length > 0
+      )
+      .map(m => ({
+        role: m.role,
+        content: m.content.trim()
+      }));
 
     const messages = [
       { role: "system", content: SYSTEM_PROMPT },
       ...safeHistory,
-      { role: "user", content: userMessage }
+      { role: "user", content: safeMessage(userMessage) } // 🔥 FIX CRÍTICO
     ];
 
     const response = await groq.chat.completions.create({
@@ -113,23 +145,29 @@ async function askNexus(userId, userMessage) {
       text = text.slice(0, 1900) + "…";
     }
 
-    // 🔊 preparar versión voz
     const speechText = cleanForSpeech(text);
 
     // 🧠 guardar memoria
     saveMemory(userId, [
       ...safeHistory,
-      { role: "user", content: userMessage },
-      { role: "assistant", content: text }
+      {
+        role: "user",
+        content: safeMessage(userMessage)
+      },
+      {
+        role: "assistant",
+        content: text
+      }
     ]);
 
     return {
       text,
-      speechText // 👈 IMPORTANTE para gTTS
+      speechText
     };
 
   } catch (error) {
     console.error("❌ NEXUS AI ERROR:", error);
+
     return {
       text: "Error interno del sistema de IA.",
       speechText: "Error interno del sistema."
