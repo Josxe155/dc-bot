@@ -34,7 +34,9 @@ module.exports = {
         userData = await memory.getUser(userId);
       }
 
-      await memory.pushMessage(userId, content);
+      // 🔥 GUARDAR USER MESSAGE CON ROLE
+      await memory.pushMessage(userId, content, "user");
+
       await memory.addXP(userId, 5);
       await memory.updateLastSeen(userId);
 
@@ -92,7 +94,6 @@ async function handleAI(message, client, userId, content, userData) {
 
     const wantsAudio = detectAudioRequest(content);
 
-    // 🧠 MEMORIA REAL (FASE 6 CORE)
     const history = userData?.memory?.recentMessages || [];
     const profile = userData?.profile || {};
 
@@ -105,11 +106,35 @@ async function handleAI(message, client, userId, content, userData) {
 
     const safeText = normalizeText(ai?.text);
 
+    // =========================
+    // 🔊 AUDIO
+    // =========================
     if (wantsAudio) {
-      return sendAudioReply(message, ai?.speechText || safeText);
+      await sendAudioReply(message, ai?.speechText || safeText);
+
+      // 🔥 GUARDAR RESPUESTA BOT
+      try {
+        await memory.pushMessage(userId, safeText, "assistant");
+      } catch (err) {
+        console.error('🔥 Error guardando respuesta IA:', err);
+      }
+
+      return;
     }
 
-    return message.reply(safeText);
+    // =========================
+    // 💬 TEXTO
+    // =========================
+    const reply = await message.reply(safeText);
+
+    // 🔥 GUARDAR RESPUESTA BOT
+    try {
+      await memory.pushMessage(userId, safeText, "assistant");
+    } catch (err) {
+      console.error('🔥 Error guardando respuesta IA:', err);
+    }
+
+    return reply;
 
   } catch (err) {
     console.error('💥 AI ERROR:', err);
