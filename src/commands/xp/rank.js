@@ -16,15 +16,18 @@ module.exports = {
       return interaction.reply("❌ Aún no tienes XP.");
     }
 
-    const data = doc.data();
+    const data = doc.data() || {};
 
-    const xp = data.xp || 0;
-    const level = data.level || 0;
+    // 🧠 FIX IMPORTANTE: evitar NaN
+    const xp = Number(data.xp ?? 0);
+    const level = Number(data.level ?? 0);
 
     const currentXP = xp % 100;
 
     const progress = Math.floor((currentXP / 100) * 10);
-    const bar = "█".repeat(progress) + "░".repeat(10 - progress);
+
+    const bar = "█".repeat(Math.max(0, progress)) +
+                "░".repeat(Math.max(0, 10 - progress));
 
     const embed = {
       color: 0x00ff99,
