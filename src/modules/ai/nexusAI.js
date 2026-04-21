@@ -71,12 +71,12 @@ function isCasual(text) {
   ].some(k => t.includes(k));
 }
 
-function isGreetingOnly(text) {
+function isDry(text) {
   if (!text || typeof text !== "string") return false;
 
   const t = text.toLowerCase().trim();
 
-  return ["hola", "hi", "hey", "holi"].includes(t);
+  return ["bien", "si", "sí", "ok", "nada", "todo bien"].includes(t);
 }
 
 // ================================
@@ -119,7 +119,7 @@ async function askNexus({ userId, message, history = [], profile = {} }) {
 
     const safeInput = safeMessage(message);
 
-    // 🧠 HISTORIAL (🔥 FIX IMPORTANTE)
+    // 🧠 HISTORIAL
     const safeHistory = history
       .slice(-10)
       .filter(m => typeof m === "string" && m.trim().length > 0)
@@ -138,22 +138,34 @@ Información del usuario:
 Usa esta información solo si es natural.
 `;
 
-    // 🔥 DETECCIÓN
+    // 🔥 DETECCIÓN INTELIGENTE
     const casual = isCasual(safeInput);
-    const greetingOnly = isGreetingOnly(safeInput);
+    const dry = isDry(safeInput);
 
     const systemExtra = casual
       ? "\nEl usuario está conversando de forma casual. Responde como humano."
       : "";
 
-    const antiLoop = greetingOnly
-      ? "\nEl usuario ya saludó antes. NO repitas saludos. Continúa la conversación."
+    const conversationContext = `
+La conversación ya está en curso.
+Responde de forma natural y fluida.
+No repitas saludos innecesarios.
+No actúes como asistente formal.
+`;
+
+    const dryContext = dry
+      ? "\nEl usuario respondió corto. Mantén la conversación viva de forma natural."
       : "";
 
     const messages = [
       {
         role: "system",
-        content: SYSTEM_PROMPT + systemExtra + antiLoop + profileContext
+        content:
+          SYSTEM_PROMPT +
+          systemExtra +
+          conversationContext +
+          dryContext +
+          profileContext
       },
       ...safeHistory,
       {
