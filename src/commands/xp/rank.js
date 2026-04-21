@@ -23,11 +23,10 @@ module.exports = {
     const data = doc.data() || {};
 
     const xp = safeNumber(data.xp);
-    const level = safeNumber(data.level);
 
-    // 🔥 XP dentro del nivel actual (más claro)
-    const levelXP = xp - (level * 100);
-    const currentXP = Math.max(0, levelXP);
+    // 🔥 fuente única de verdad
+    const level = Math.floor(xp / 100);
+    const currentXP = xp % 100;
 
     const percent = currentXP / 100;
 
