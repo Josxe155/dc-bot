@@ -133,6 +133,7 @@ Usa esta información solo si es natural.
 `;
 
     // 🔥 DETECCIÓN CASUAL (YA SEGURA)
+    console.log("DEBUG message:", message);
     const casual = isCasual(safeInput);
 
     const systemExtra = casual
