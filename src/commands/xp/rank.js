@@ -23,16 +23,16 @@ module.exports = {
 
     const data = doc.data() || {};
 
-    // 🛡️ FULL SAFE
+    // 🛡️ SAFE DATA
     const xp = safeNumber(data.xp);
     const level = safeNumber(data.level);
 
-    const currentXP = xp % 100;
+    const currentXP = Math.max(0, xp % 100);
 
-    const progress = Math.floor((currentXP / 100) * 10);
+    const progress = Math.min(10, Math.floor((currentXP / 100) * 10));
 
-    const bar = "█".repeat(Math.max(0, progress)) +
-                "░".repeat(Math.max(0, 10 - progress));
+    const bar = "█".repeat(progress) +
+                "░".repeat(10 - progress);
 
     const embed = {
       color: 0x00ff99,

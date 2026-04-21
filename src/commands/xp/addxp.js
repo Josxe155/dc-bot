@@ -24,10 +24,18 @@ module.exports = {
     const userRef = db.collection('users').doc(user.id);
     const doc = await userRef.get();
 
-    let data = { xp: 0, level: 0 };
-    if (doc.exists) data = doc.data();
+    const data = doc.exists ? (doc.data() || {}) : {};
 
-    const newXP = data.xp + xpToAdd;
+    // 🛡️ FIX ANTI NaN
+    const currentXP = Number(data.xp);
+    const currentLevel = Number(data.level);
+
+    const safeXP = isNaN(currentXP) ? 0 : currentXP;
+    const safeLevel = isNaN(currentLevel) ? 0 : currentLevel;
+
+    const addXP = Number(xpToAdd);
+
+    const newXP = safeXP + (isNaN(addXP) ? 0 : addXP);
     const newLevel = Math.floor(newXP / 100);
 
     await userRef.set({
@@ -36,6 +44,8 @@ module.exports = {
       updatedAt: Date.now()
     }, { merge: true });
 
-    return interaction.reply(`✅ Se añadieron **${xpToAdd} XP** a <@${user.id}>`);
+    return interaction.reply(
+      `✅ Se añadieron **${addXP} XP** a <@${user.id}>`
+    );
   }
 };

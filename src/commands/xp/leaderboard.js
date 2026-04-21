@@ -20,8 +20,12 @@ module.exports = {
     let i = 1;
 
     snapshot.forEach(doc => {
-      const data = doc.data();
-      description += `**${i}.** <@${doc.id}> — ${data.xp} XP\n`;
+      const data = doc.data() || {};
+
+      const xp = Number(data.xp);
+      const safeXP = isNaN(xp) ? 0 : xp;
+
+      description += `**${i}.** <@${doc.id}> — ${safeXP} XP\n`;
       i++;
     });
 
