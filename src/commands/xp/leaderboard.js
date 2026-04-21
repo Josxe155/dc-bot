@@ -1,10 +1,5 @@
-const { db } = require('../../config/firebase');
 const { SlashCommandBuilder } = require('discord.js');
-
-const safeNumber = (v) => {
-  const n = Number(v);
-  return isNaN(n) ? 0 : n;
-};
+const db = require('../../config/firebase').rtdb;
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -12,25 +7,26 @@ module.exports = {
     .setDescription('Top usuarios con más XP'),
 
   async execute(interaction) {
-    const snapshot = await db.collection('users')
-      .orderBy('xp', 'desc')
-      .limit(10)
-      .get();
+    const snapshot = await db.ref('users').get();
 
-    if (snapshot.empty) {
+    if (!snapshot.exists()) {
       return interaction.reply("❌ No hay datos.");
     }
 
+    const users = snapshot.val();
+
+    const sorted = Object.entries(users)
+      .map(([id, data]) => ({
+        id,
+        xp: Number(data?.stats?.xp || 0)
+      }))
+      .sort((a, b) => b.xp - a.xp)
+      .slice(0, 10);
+
     let description = "";
-    let i = 1;
 
-    snapshot.forEach(doc => {
-      const data = doc.data() || {};
-
-      const xp = safeNumber(data.xp);
-
-      description += `**${i}.** <@${doc.id}> — ${xp} XP\n`;
-      i++;
+    sorted.forEach((user, i) => {
+      description += `**${i + 1}.** <@${user.id}> — ${user.xp} XP\n`;
     });
 
     return interaction.reply({

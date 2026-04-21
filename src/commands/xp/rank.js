@@ -14,8 +14,7 @@ module.exports = {
   async execute(interaction) {
     const userId = interaction.user.id;
 
-    const userRef = db.collection('users').doc(userId);
-    const doc = await userRef.get();
+    const doc = await db.collection('users').doc(userId).get();
 
     if (!doc.exists) {
       return interaction.reply("❌ Aún no tienes XP.");
@@ -23,49 +22,48 @@ module.exports = {
 
     const data = doc.data() || {};
 
-    // 🛡️ SAFE VALUES
     const xp = safeNumber(data.xp);
     const level = safeNumber(data.level);
 
-    const currentXP = Math.max(0, xp % 100);
+    // 🔥 XP dentro del nivel actual (más claro)
+    const levelXP = xp - (level * 100);
+    const currentXP = Math.max(0, levelXP);
 
-    // 🔥 FIX BAR SAFE
     const percent = currentXP / 100;
 
-    const filled = Math.round(percent * 10);
-    const safeFilled = Math.min(10, Math.max(0, filled));
+    const filled = Math.floor(percent * 10);
+    const empty = 10 - filled;
 
     const bar =
-      "█".repeat(safeFilled) +
-      "░".repeat(10 - safeFilled);
+      "█".repeat(filled) +
+      "░".repeat(empty);
 
-    const embed = {
-      color: 0x00ff99,
-      title: "📊 Tu Nivel",
-      description: `<@${userId}>`,
-      thumbnail: {
-        url: interaction.user.displayAvatarURL()
-      },
-      fields: [
-        {
-          name: "🏆 Nivel",
-          value: `**${level}**`,
-          inline: true
-        },
-        {
-          name: "✨ XP",
-          value: `**${xp}**`,
-          inline: true
-        },
-        {
-          name: "📈 Progreso",
-          value: `\`${bar}\`\n${currentXP}/100 XP`,
-          inline: false
+    return interaction.reply({
+      embeds: [{
+        color: 0x00ff99,
+        title: "📊 Tu Nivel",
+        description: `<@${userId}>`,
+        fields: [
+          {
+            name: "🏆 Nivel",
+            value: `**${level}**`,
+            inline: true
+          },
+          {
+            name: "✨ XP Total",
+            value: `**${xp}**`,
+            inline: true
+          },
+          {
+            name: "📈 Progreso",
+            value: `\`${bar}\`\n${currentXP}/100 XP`,
+            inline: false
+          }
+        ],
+        thumbnail: {
+          url: interaction.user.displayAvatarURL()
         }
-      ],
-      timestamp: new Date()
-    };
-
-    return interaction.reply({ embeds: [embed] });
+      }]
+    });
   }
 };

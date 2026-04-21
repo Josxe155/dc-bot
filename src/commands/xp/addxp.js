@@ -1,6 +1,8 @@
 const { db } = require('../../config/firebase');
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 
+const LEVEL_CHANNEL_ID = "1496236194109849670";
+
 const safeNumber = (v) => {
   const n = Number(v);
   return isNaN(n) ? 0 : n;
@@ -31,7 +33,6 @@ module.exports = {
 
     const data = doc.exists ? (doc.data() || {}) : {};
 
-    // 🛡️ SAFE VALUES
     const currentXP = safeNumber(data.xp);
     const currentLevel = safeNumber(data.level);
     const addXP = safeNumber(xpToAdd);
@@ -44,6 +45,19 @@ module.exports = {
       level: newLevel,
       updatedAt: Date.now()
     }, { merge: true });
+
+    // 🔥 LEVEL UP CHECK
+    if (newLevel > currentLevel) {
+      try {
+        const channel = await interaction.client.channels.fetch(LEVEL_CHANNEL_ID);
+
+        await channel.send(
+          `🎉 <@${user.id}> ha subido a **nivel ${newLevel}** 🚀`
+        );
+      } catch (err) {
+        console.error("LEVEL UP CHANNEL ERROR:", err);
+      }
+    }
 
     return interaction.reply(
       `✅ Se añadieron **${addXP} XP** a <@${user.id}>`
