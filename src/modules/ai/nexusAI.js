@@ -52,7 +52,7 @@ IMPORTANTE:
 `;
 
 // ================================
-// 🧠 DETECTOR DE CONVERSACIÓN (FIX)
+// 🧠 DETECTORES
 // ================================
 function isCasual(text) {
   if (!text || typeof text !== "string") return false;
@@ -63,6 +63,7 @@ function isCasual(text) {
     "hola",
     "que tal",
     "cómo estás",
+    "como estas",
     "como te va",
     "nada",
     "charlar",
@@ -70,8 +71,16 @@ function isCasual(text) {
   ].some(k => t.includes(k));
 }
 
+function isGreetingOnly(text) {
+  if (!text || typeof text !== "string") return false;
+
+  const t = text.toLowerCase().trim();
+
+  return ["hola", "hi", "hey", "holi"].includes(t);
+}
+
 // ================================
-// 🔊 LIMPIAR TEXTO PARA VOZ
+// 🔊 LIMPIAR TEXTO
 // ================================
 function cleanForSpeech(text) {
   return (text || "")
@@ -88,16 +97,14 @@ function cleanForSpeech(text) {
 // 🛡️ SAFE MESSAGE
 // ================================
 function safeMessage(text) {
-  if (!text || typeof text !== "string") {
-    return "Hola";
-  }
+  if (!text || typeof text !== "string") return "Hola";
 
   const clean = text.trim();
   return clean.length > 0 ? clean : "Hola";
 }
 
 // ================================
-// 🤖 FUNCIÓN PRINCIPAL (FIX FINAL)
+// 🤖 FUNCIÓN PRINCIPAL
 // ================================
 async function askNexus({ userId, message, history = [], profile = {} }) {
   try {
@@ -110,19 +117,18 @@ async function askNexus({ userId, message, history = [], profile = {} }) {
       };
     }
 
-    // 🔥 SANITIZAR INPUT
     const safeInput = safeMessage(message);
 
-    // 🧠 HISTORIAL DESDE FIREBASE
+    // 🧠 HISTORIAL (🔥 FIX IMPORTANTE)
     const safeHistory = history
       .slice(-10)
       .filter(m => typeof m === "string" && m.trim().length > 0)
-      .map(msg => ({
-        role: "user",
+      .map((msg, i) => ({
+        role: i % 2 === 0 ? "user" : "assistant",
         content: msg
       }));
 
-    // 🧠 PERFIL USUARIO
+    // 🧠 PERFIL
     const username = profile?.username || "usuario";
 
     const profileContext = `
@@ -132,18 +138,22 @@ Información del usuario:
 Usa esta información solo si es natural.
 `;
 
-    // 🔥 DETECCIÓN CASUAL (YA SEGURA)
-    console.log("DEBUG message:", message);
+    // 🔥 DETECCIÓN
     const casual = isCasual(safeInput);
+    const greetingOnly = isGreetingOnly(safeInput);
 
     const systemExtra = casual
-      ? "\nEl usuario está conversando de forma casual. Responde como humano, no como asistente."
+      ? "\nEl usuario está conversando de forma casual. Responde como humano."
+      : "";
+
+    const antiLoop = greetingOnly
+      ? "\nEl usuario ya saludó antes. NO repitas saludos. Continúa la conversación."
       : "";
 
     const messages = [
       {
         role: "system",
-        content: SYSTEM_PROMPT + systemExtra + profileContext
+        content: SYSTEM_PROMPT + systemExtra + antiLoop + profileContext
       },
       ...safeHistory,
       {
@@ -160,8 +170,8 @@ Usa esta información solo si es natural.
     });
 
     let text =
-      response?.choices?.[0]?.message?.content?.trim()
-      || "No pude generar respuesta.";
+      response?.choices?.[0]?.message?.content?.trim() ||
+      "No pude generar respuesta.";
 
     if (text.length > 1900) {
       text = text.slice(0, 1900) + "…";
