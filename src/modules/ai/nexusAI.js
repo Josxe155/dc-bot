@@ -7,7 +7,7 @@ const groq = new Groq({
 
 const MODEL = "llama-3.3-70b-versatile";
 
-// 🎭 PERSONALIDAD (NO TOCAR)
+// 🎭 PERSONALIDAD (NO TOCADA)
 const SYSTEM_PROMPT = `
 Eres Nexus, una inteligencia artificial dentro de Discord.
 
@@ -52,18 +52,37 @@ IMPORTANTE:
 `;
 
 // ================================
-// 🧠 DETECTORES
+// 🧠 MEMORIA
+// ================================
+const memory = new Map();
+
+function getMemory(userId) {
+  return memory.get(userId) || [];
+}
+
+function saveMemory(userId, messages) {
+  const clean = messages
+    .filter(m =>
+      m &&
+      typeof m.role === "string" &&
+      typeof m.content === "string" &&
+      m.content.trim().length > 0
+    )
+    .slice(-12);
+
+  memory.set(userId, clean);
+}
+
+// ================================
+// 🧠 DETECTOR DE CONVERSACIÓN
 // ================================
 function isCasual(text) {
-  if (!text || typeof text !== "string") return false;
-
   const t = text.toLowerCase();
 
   return [
     "hola",
     "que tal",
     "cómo estás",
-    "como estas",
     "como te va",
     "nada",
     "charlar",
@@ -71,16 +90,8 @@ function isCasual(text) {
   ].some(k => t.includes(k));
 }
 
-function isDry(text) {
-  if (!text || typeof text !== "string") return false;
-
-  const t = text.toLowerCase().trim();
-
-  return ["bien", "si", "sí", "ok", "nada", "todo bien"].includes(t);
-}
-
 // ================================
-// 🔊 LIMPIAR TEXTO
+// 🔊 LIMPIAR TEXTO PARA VOZ
 // ================================
 function cleanForSpeech(text) {
   return (text || "")
@@ -97,7 +108,9 @@ function cleanForSpeech(text) {
 // 🛡️ SAFE MESSAGE
 // ================================
 function safeMessage(text) {
-  if (!text || typeof text !== "string") return "Hola";
+  if (!text || typeof text !== "string") {
+    return "Hola";
+  }
 
   const clean = text.trim();
   return clean.length > 0 ? clean : "Hola";
@@ -106,47 +119,92 @@ function safeMessage(text) {
 // ================================
 // 🤖 FUNCIÓN PRINCIPAL
 // ================================
-async function askNexus({ userId, message, history = [], profile = {} }) {
+async function askNexus(userId, userMessage) {
   try {
     const limitState = softLimit.check(userId);
-    if (limitState.blocked) return { text: "Límite alcanzado...", speechText: "Límite alcanzado" };
 
-    const safeInput = safeMessage(message);
+    if (limitState.blocked) {
+      return {
+        text: "Has alcanzado el límite temporal, intenta más tarde.",
+        speechText: "Has alcanzado el límite temporal."
+      };
+    }
 
-    // 1. EL SYSTEM PROMPT DEBE SER LIMPIO
+    const history = getMemory(userId);
+
+    const safeHistory = history
+      .slice(-10)
+      .filter(m =>
+        m &&
+        typeof m.role === "string" &&
+        typeof m.content === "string" &&
+        m.content.trim().length > 0
+      )
+      .map(m => ({
+        role: m.role,
+        content: m.content.trim()
+      }));
+
+    // 🔥 DETECTAR TIPO DE MENSAJE
+    const casual = isCasual(userMessage);
+
+    const systemExtra = casual
+      ? "\nEl usuario está conversando de forma casual. Responde como humano, no como asistente. No preguntes '¿en qué puedo ayudarte?'."
+      : "";
+
     const messages = [
       {
         role: "system",
-        content: SYSTEM_PROMPT + `\nUsuario actual: ${profile?.username || "usuario"}`
+        content: SYSTEM_PROMPT + systemExtra
+      },
+      ...safeHistory,
+      {
+        role: "user",
+        content: safeMessage(userMessage)
       }
     ];
 
-    // 2. FORMATEAR EL HISTORIAL CORRECTAMENTE (FIX CLAVE 🔥)
-    // Asumiendo que 'history' es un array de objetos { role: 'user'|'assistant', content: '...' }
-    // Si tu 'history' es solo un array de strings, necesitas mapearlo.
-    if (history.length > 0) {
-      messages.push(...history.slice(-8)); 
-    }
-
-    // 3. AÑADIR EL MENSAJE ACTUAL DEL USUARIO
-    messages.push({ role: "user", content: safeInput });
-
     const response = await groq.chat.completions.create({
       model: MODEL,
-      messages, // Enviamos el array de objetos, NO un string gigante
-      temperature: 0.8, // Sube un poco para evitar respuestas robóticas
-      presence_penalty: 0.5, // Ayuda a que no repita las mismas palabras
+      messages,
+      temperature: 0.7,
+      max_tokens: limitState.reduced ? 150 : 350
     });
 
-    let text = response?.choices?.[0]?.message?.content?.trim() || "No pude generar respuesta.";
+    let text =
+      response?.choices?.[0]?.message?.content?.trim()
+      || "No pude generar respuesta.";
 
-    // ... (tu lógica de recorte de 1900 caracteres)
+    if (text.length > 1900) {
+      text = text.slice(0, 1900) + "…";
+    }
 
-    return { text, speechText: cleanForSpeech(text) };
+    const speechText = cleanForSpeech(text);
+
+    saveMemory(userId, [
+      ...safeHistory,
+      {
+        role: "user",
+        content: safeMessage(userMessage)
+      },
+      {
+        role: "assistant",
+        content: text
+      }
+    ]);
+
+    return {
+      text,
+      speechText
+    };
 
   } catch (error) {
     console.error("❌ NEXUS AI ERROR:", error);
-    return { text: "Error interno.", speechText: "Error interno." };
+
+    return {
+      text: "Error interno del sistema de IA.",
+      speechText: "Error interno del sistema."
+    };
   }
 }
 
