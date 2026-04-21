@@ -7,7 +7,7 @@ const groq = new Groq({
 
 const MODEL = "llama-3.3-70b-versatile";
 
-// 🎭 PERSONALIDAD (NO TOCADA)
+// 🎭 PERSONALIDAD (NO TOCAR)
 const SYSTEM_PROMPT = `
 Eres Nexus, una inteligencia artificial dentro de Discord.
 
@@ -52,9 +52,11 @@ IMPORTANTE:
 `;
 
 // ================================
-// 🧠 DETECTOR DE CONVERSACIÓN
+// 🧠 DETECTOR DE CONVERSACIÓN (FIX)
 // ================================
 function isCasual(text) {
+  if (!text || typeof text !== "string") return false;
+
   const t = text.toLowerCase();
 
   return [
@@ -95,7 +97,7 @@ function safeMessage(text) {
 }
 
 // ================================
-// 🤖 FUNCIÓN PRINCIPAL (🔥 FIX REAL)
+// 🤖 FUNCIÓN PRINCIPAL (FIX FINAL)
 // ================================
 async function askNexus({ userId, message, history = [], profile = {} }) {
   try {
@@ -107,6 +109,9 @@ async function askNexus({ userId, message, history = [], profile = {} }) {
         speechText: "Has alcanzado el límite temporal."
       };
     }
+
+    // 🔥 SANITIZAR INPUT
+    const safeInput = safeMessage(message);
 
     // 🧠 HISTORIAL DESDE FIREBASE
     const safeHistory = history
@@ -127,8 +132,8 @@ Información del usuario:
 Usa esta información solo si es natural.
 `;
 
-    // 🔥 DETECCIÓN CASUAL
-    const casual = isCasual(message);
+    // 🔥 DETECCIÓN CASUAL (YA SEGURA)
+    const casual = isCasual(safeInput);
 
     const systemExtra = casual
       ? "\nEl usuario está conversando de forma casual. Responde como humano, no como asistente."
@@ -142,7 +147,7 @@ Usa esta información solo si es natural.
       ...safeHistory,
       {
         role: "user",
-        content: safeMessage(message)
+        content: safeInput
       }
     ];
 
