@@ -119,14 +119,15 @@ async function askNexus({ userId, message, history = [], profile = {} }) {
 
     const safeInput = safeMessage(message);
 
-    // 🧠 HISTORIAL
-    const safeHistory = history
+    // 🧠 HISTORIAL COMO TEXTO (🔥 FIX REAL)
+    const historyText = history
       .slice(-10)
       .filter(m => typeof m === "string" && m.trim().length > 0)
-      .map((msg, i) => ({
-        role: i % 2 === 0 ? "user" : "assistant",
-        content: msg
-      }));
+      .join("\n");
+
+    const historyContext = historyText
+      ? `\nConversación reciente:\n${historyText}\n`
+      : "";
 
     // 🧠 PERFIL
     const username = profile?.username || "usuario";
@@ -138,7 +139,7 @@ Información del usuario:
 Usa esta información solo si es natural.
 `;
 
-    // 🔥 DETECCIÓN INTELIGENTE
+    // 🔥 DETECCIÓN
     const casual = isCasual(safeInput);
     const dry = isDry(safeInput);
 
@@ -165,9 +166,9 @@ No actúes como asistente formal.
           systemExtra +
           conversationContext +
           dryContext +
+          historyContext +
           profileContext
       },
-      ...safeHistory,
       {
         role: "user",
         content: safeInput
