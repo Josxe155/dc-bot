@@ -52,28 +52,6 @@ IMPORTANTE:
 `;
 
 // ================================
-// 🧠 MEMORIA
-// ================================
-const memory = new Map();
-
-function getMemory(userId) {
-  return memory.get(userId) || [];
-}
-
-function saveMemory(userId, messages) {
-  const clean = messages
-    .filter(m =>
-      m &&
-      typeof m.role === "string" &&
-      typeof m.content === "string" &&
-      m.content.trim().length > 0
-    )
-    .slice(-12);
-
-  memory.set(userId, clean);
-}
-
-// ================================
 // 🧠 DETECTOR DE CONVERSACIÓN
 // ================================
 function isCasual(text) {
@@ -117,9 +95,9 @@ function safeMessage(text) {
 }
 
 // ================================
-// 🤖 FUNCIÓN PRINCIPAL
+// 🤖 FUNCIÓN PRINCIPAL (🔥 FIX REAL)
 // ================================
-async function askNexus(userId, userMessage) {
+async function askNexus({ userId, message, history = [], profile = {} }) {
   try {
     const limitState = softLimit.check(userId);
 
@@ -130,37 +108,41 @@ async function askNexus(userId, userMessage) {
       };
     }
 
-    const history = getMemory(userId);
-
+    // 🧠 HISTORIAL DESDE FIREBASE
     const safeHistory = history
       .slice(-10)
-      .filter(m =>
-        m &&
-        typeof m.role === "string" &&
-        typeof m.content === "string" &&
-        m.content.trim().length > 0
-      )
-      .map(m => ({
-        role: m.role,
-        content: m.content.trim()
+      .filter(m => typeof m === "string" && m.trim().length > 0)
+      .map(msg => ({
+        role: "user",
+        content: msg
       }));
 
-    // 🔥 DETECTAR TIPO DE MENSAJE
-    const casual = isCasual(userMessage);
+    // 🧠 PERFIL USUARIO
+    const username = profile?.username || "usuario";
+
+    const profileContext = `
+Información del usuario:
+- Nombre: ${username}
+
+Usa esta información solo si es natural.
+`;
+
+    // 🔥 DETECCIÓN CASUAL
+    const casual = isCasual(message);
 
     const systemExtra = casual
-      ? "\nEl usuario está conversando de forma casual. Responde como humano, no como asistente. No preguntes '¿en qué puedo ayudarte?'."
+      ? "\nEl usuario está conversando de forma casual. Responde como humano, no como asistente."
       : "";
 
     const messages = [
       {
         role: "system",
-        content: SYSTEM_PROMPT + systemExtra
+        content: SYSTEM_PROMPT + systemExtra + profileContext
       },
       ...safeHistory,
       {
         role: "user",
-        content: safeMessage(userMessage)
+        content: safeMessage(message)
       }
     ];
 
@@ -179,23 +161,9 @@ async function askNexus(userId, userMessage) {
       text = text.slice(0, 1900) + "…";
     }
 
-    const speechText = cleanForSpeech(text);
-
-    saveMemory(userId, [
-      ...safeHistory,
-      {
-        role: "user",
-        content: safeMessage(userMessage)
-      },
-      {
-        role: "assistant",
-        content: text
-      }
-    ]);
-
     return {
       text,
-      speechText
+      speechText: cleanForSpeech(text)
     };
 
   } catch (error) {
