@@ -16,28 +16,30 @@ module.exports = {
     const isDM = !message.guild;
     const NEXUS_GUILD_ID = process.env.NEXUS_GUILD_ID;
 
-    let content = message.content?.trim();
-    if (!content) return;
+    const contentRaw = message.content?.trim();
+    if (!contentRaw) return;
 
     const userId = message.author.id;
-    const lower = content.toLowerCase();
+    const lower = contentRaw.toLowerCase();
 
     // =========================
-    // 🧠 FIREBASE MEMORY
+    // 🧠 FIREBASE MEMORY + XP
     // =========================
-    let userData;
     try {
-      userData = await memory.getUser(userId);
+      let userData = await memory.getUser(userId);
 
       if (!userData) {
         await memory.createUser(message.author);
         userData = await memory.getUser(userId);
       }
 
-      // 🔥 GUARDAR MENSAJE USER CON ROLE
-      await memory.pushMessage(userId, content, "user");
+      // 💬 guardar mensaje
+      await memory.pushMessage(userId, contentRaw, "user");
 
+      // ⭐ XP SYSTEM (RTDB ONLY)
       await memory.addXP(userId, 5);
+
+      // ⏱ last seen
       await memory.updateLastSeen(userId);
 
     } catch (err) {
@@ -48,7 +50,7 @@ module.exports = {
     // 💬 DM → IA
     // =========================
     if (isDM) {
-      return handleAI(message, client, userId, content);
+      return handleAI(message, client, userId, contentRaw);
     }
 
     // =========================
@@ -57,9 +59,7 @@ module.exports = {
     if (message.guild.id !== NEXUS_GUILD_ID) return;
 
     const isMention = message.mentions.has(client.user.id);
-
-    const isDirectCall =
-      lower.startsWith('nexus ') || lower === 'nexus';
+    const isDirectCall = lower.startsWith('nexus ') || lower === 'nexus';
 
     let isReplyToBot = false;
 
@@ -71,6 +71,8 @@ module.exports = {
     }
 
     if (!isMention && !isDirectCall && !isReplyToBot) return;
+
+    let content = contentRaw;
 
     if (!isReplyToBot) {
       content = content
@@ -94,23 +96,17 @@ async function handleAI(message, client, userId, content) {
 
     const wantsAudio = detectAudioRequest(content);
 
-    // 🔥 FIX PRINCIPAL → llamada correcta
     const ai = await askNexus(userId, content);
-
     const safeText = normalizeText(ai?.text);
 
     if (wantsAudio) {
       await sendAudioReply(message, ai?.speechText || safeText);
-
-      // 🔥 guardar respuesta IA
       await memory.pushMessage(userId, safeText, "assistant");
-
       return;
     }
 
     const reply = await message.reply(safeText);
 
-    // 🔥 guardar respuesta IA
     await memory.pushMessage(userId, safeText, "assistant");
 
     return reply;
