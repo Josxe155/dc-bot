@@ -1,6 +1,11 @@
 const { db } = require('../../config/firebase');
 const { SlashCommandBuilder } = require('discord.js');
 
+const safeNumber = (v) => {
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+};
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('rank')
@@ -18,9 +23,9 @@ module.exports = {
 
     const data = doc.data() || {};
 
-    // 🧠 FIX IMPORTANTE: evitar NaN
-    const xp = Number(data.xp ?? 0);
-    const level = Number(data.level ?? 0);
+    // 🛡️ FULL SAFE
+    const xp = safeNumber(data.xp);
+    const level = safeNumber(data.level);
 
     const currentXP = xp % 100;
 
