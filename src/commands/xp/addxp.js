@@ -1,6 +1,11 @@
 const { db } = require('../../config/firebase');
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 
+const safeNumber = (v) => {
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+};
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('addxp')
@@ -26,16 +31,12 @@ module.exports = {
 
     const data = doc.exists ? (doc.data() || {}) : {};
 
-    // 🛡️ FIX ANTI NaN
-    const currentXP = Number(data.xp);
-    const currentLevel = Number(data.level);
+    // 🛡️ SAFE VALUES
+    const currentXP = safeNumber(data.xp);
+    const currentLevel = safeNumber(data.level);
+    const addXP = safeNumber(xpToAdd);
 
-    const safeXP = isNaN(currentXP) ? 0 : currentXP;
-    const safeLevel = isNaN(currentLevel) ? 0 : currentLevel;
-
-    const addXP = Number(xpToAdd);
-
-    const newXP = safeXP + (isNaN(addXP) ? 0 : addXP);
+    const newXP = currentXP + addXP;
     const newLevel = Math.floor(newXP / 100);
 
     await userRef.set({

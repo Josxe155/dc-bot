@@ -1,6 +1,11 @@
 const { db } = require('../../config/firebase');
 const { SlashCommandBuilder } = require('discord.js');
 
+const safeNumber = (v) => {
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+};
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('leaderboard')
@@ -22,19 +27,20 @@ module.exports = {
     snapshot.forEach(doc => {
       const data = doc.data() || {};
 
-      const xp = Number(data.xp);
-      const safeXP = isNaN(xp) ? 0 : xp;
+      const xp = safeNumber(data.xp);
 
-      description += `**${i}.** <@${doc.id}> — ${safeXP} XP\n`;
+      description += `**${i}.** <@${doc.id}> — ${xp} XP\n`;
       i++;
     });
 
-    const embed = {
-      color: 0xffd700,
-      title: "🏆 Leaderboard",
-      description
-    };
-
-    return interaction.reply({ embeds: [embed] });
+    return interaction.reply({
+      embeds: [
+        {
+          color: 0xffd700,
+          title: "🏆 Leaderboard",
+          description
+        }
+      ]
+    });
   }
 };
