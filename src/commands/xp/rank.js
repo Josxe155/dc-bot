@@ -23,16 +23,21 @@ module.exports = {
 
     const data = doc.data() || {};
 
-    // 🛡️ SAFE DATA
+    // 🛡️ SAFE VALUES
     const xp = safeNumber(data.xp);
     const level = safeNumber(data.level);
 
     const currentXP = Math.max(0, xp % 100);
 
-    const progress = Math.min(10, Math.floor((currentXP / 100) * 10));
+    // 🔥 FIX BAR SAFE
+    const percent = currentXP / 100;
 
-    const bar = "█".repeat(progress) +
-                "░".repeat(10 - progress);
+    const filled = Math.round(percent * 10);
+    const safeFilled = Math.min(10, Math.max(0, filled));
+
+    const bar =
+      "█".repeat(safeFilled) +
+      "░".repeat(10 - safeFilled);
 
     const embed = {
       color: 0x00ff99,

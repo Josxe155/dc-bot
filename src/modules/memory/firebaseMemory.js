@@ -3,7 +3,7 @@ const admin = require("firebase-admin");
 // =========================
 // 🔥 INIT FIREBASE (RTDB)
 // =========================
-const firebaseConfig = require("../../config/firebase"); // 👈 FIX CLAVE
+const firebaseConfig = require("../../config/firebase");
 
 function initFirebase() {
   if (!admin.apps.length) {
@@ -57,7 +57,7 @@ async function createUser(user) {
 }
 
 // =========================
-// 💬 GUARDAR MENSAJE (MEMORIA CORTA)
+// 💬 GUARDAR MENSAJE
 // =========================
 async function pushMessage(userId, message) {
   const ref = db.ref(`users/${userId}/memory/recentMessages`);
@@ -78,7 +78,7 @@ async function pushMessage(userId, message) {
 }
 
 // =========================
-// 📊 XP SYSTEM
+// 📊 XP SYSTEM (FIXED)
 // =========================
 async function addXP(userId, amount = 5) {
   const ref = db.ref(`users/${userId}/stats`);
@@ -86,15 +86,17 @@ async function addXP(userId, amount = 5) {
   const snapshot = await ref.get();
   const stats = snapshot.val() || { xp: 0, level: 1 };
 
-  let xp = stats.xp + amount;
-  let level = stats.level;
+  const currentXP = Number(stats.xp) || 0;
+  const currentLevel = Number(stats.level) || 1;
+  const add = Number(amount) || 0;
 
-  if (xp >= level * 100) {
-    xp = 0;
-    level += 1;
-  }
+  const xp = currentXP + add;
+  const level = Math.floor(xp / 100);
 
-  await ref.update({ xp, level });
+  await ref.update({
+    xp,
+    level
+  });
 
   return { xp, level };
 }
