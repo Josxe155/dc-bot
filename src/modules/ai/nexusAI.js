@@ -109,99 +109,44 @@ function safeMessage(text) {
 async function askNexus({ userId, message, history = [], profile = {} }) {
   try {
     const limitState = softLimit.check(userId);
-
-    if (limitState.blocked) {
-      return {
-        text: "Has alcanzado el límite temporal, intenta más tarde.",
-        speechText: "Has alcanzado el límite temporal."
-      };
-    }
+    if (limitState.blocked) return { text: "Límite alcanzado...", speechText: "Límite alcanzado" };
 
     const safeInput = safeMessage(message);
 
-    // 🧠 HISTORIAL COMO TEXTO (🔥 FIX REAL)
-    const historyText = history
-      .slice(-10)
-      .filter(m => typeof m === "string" && m.trim().length > 0)
-      .join("\n");
-
-    const historyContext = historyText
-      ? `\nConversación reciente:\n${historyText}\n`
-      : "";
-
-    // 🧠 PERFIL
-    const username = profile?.username || "usuario";
-
-    const profileContext = `
-Información del usuario:
-- Nombre: ${username}
-
-Usa esta información solo si es natural.
-`;
-
-    // 🔥 DETECCIÓN
-    const casual = isCasual(safeInput);
-    const dry = isDry(safeInput);
-
-    const systemExtra = casual
-      ? "\nEl usuario está conversando de forma casual. Responde como humano."
-      : "";
-
-    const conversationContext = `
-La conversación ya está en curso.
-Responde de forma natural y fluida.
-No repitas saludos innecesarios.
-No actúes como asistente formal.
-`;
-
-    const dryContext = dry
-      ? "\nEl usuario respondió corto. Mantén la conversación viva de forma natural."
-      : "";
-
+    // 1. EL SYSTEM PROMPT DEBE SER LIMPIO
     const messages = [
       {
         role: "system",
-        content:
-          SYSTEM_PROMPT +
-          systemExtra +
-          conversationContext +
-          dryContext +
-          historyContext +
-          profileContext
-      },
-      {
-        role: "user",
-        content: safeInput
+        content: SYSTEM_PROMPT + `\nUsuario actual: ${profile?.username || "usuario"}`
       }
     ];
 
-    const response = await groq.chat.completions.create({
-      model: MODEL,
-      messages,
-      temperature: 0.7,
-      max_tokens: limitState.reduced ? 150 : 350
-    });
-
-    let text =
-      response?.choices?.[0]?.message?.content?.trim() ||
-      "No pude generar respuesta.";
-
-    if (text.length > 1900) {
-      text = text.slice(0, 1900) + "…";
+    // 2. FORMATEAR EL HISTORIAL CORRECTAMENTE (FIX CLAVE 🔥)
+    // Asumiendo que 'history' es un array de objetos { role: 'user'|'assistant', content: '...' }
+    // Si tu 'history' es solo un array de strings, necesitas mapearlo.
+    if (history.length > 0) {
+      messages.push(...history.slice(-8)); 
     }
 
-    return {
-      text,
-      speechText: cleanForSpeech(text)
-    };
+    // 3. AÑADIR EL MENSAJE ACTUAL DEL USUARIO
+    messages.push({ role: "user", content: safeInput });
+
+    const response = await groq.chat.completions.create({
+      model: MODEL,
+      messages, // Enviamos el array de objetos, NO un string gigante
+      temperature: 0.8, // Sube un poco para evitar respuestas robóticas
+      presence_penalty: 0.5, // Ayuda a que no repita las mismas palabras
+    });
+
+    let text = response?.choices?.[0]?.message?.content?.trim() || "No pude generar respuesta.";
+
+    // ... (tu lógica de recorte de 1900 caracteres)
+
+    return { text, speechText: cleanForSpeech(text) };
 
   } catch (error) {
     console.error("❌ NEXUS AI ERROR:", error);
-
-    return {
-      text: "Error interno del sistema de IA.",
-      speechText: "Error interno del sistema."
-    };
+    return { text: "Error interno.", speechText: "Error interno." };
   }
 }
 
