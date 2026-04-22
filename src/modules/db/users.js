@@ -18,9 +18,11 @@ async function ensureUser(userId) {
   }
 }
 
-// 💬 Guardar mensaje
+// 💬 Guardar mensaje (SAFE)
 async function saveMessage(userId, message) {
   const ref = db.collection("users").doc(userId);
+
+  await ensureUser(userId); // 🔥 FIX
 
   await ref.update({
     messages: admin.firestore.FieldValue.arrayUnion({
@@ -30,9 +32,11 @@ async function saveMessage(userId, message) {
   });
 }
 
-// 📊 Incrementar uso diario
+// 📊 Incrementar uso diario (SAFE)
 async function incrementUsage(userId) {
   const ref = db.collection("users").doc(userId);
+
+  await ensureUser(userId); // 🔥 FIX
 
   await ref.update({
     dailyUsage: admin.firestore.FieldValue.increment(1),

@@ -19,8 +19,8 @@ const db = admin.database();
 // 🧠 OBTENER USUARIO
 // =========================
 async function getUser(userId) {
-  const snapshot = await db.ref(`users/${userId}`).get();
-  return snapshot.exists() ? snapshot.val() : null;
+  const snap = await db.ref(`users/${userId}`).get();
+  return snap.exists() ? snap.val() : null;
 }
 
 // =========================
@@ -62,8 +62,8 @@ async function createUser(user) {
 async function pushMessage(userId, message) {
   const ref = db.ref(`users/${userId}/memory/recentMessages`);
 
-  const snapshot = await ref.get();
-  let messages = snapshot.val() || [];
+  const snap = await ref.get();
+  let messages = snap.val() || [];
 
   messages.push({
     content: message,
@@ -78,27 +78,34 @@ async function pushMessage(userId, message) {
 }
 
 // =========================
-// 📊 XP SYSTEM (FIXED)
+// 📊 XP SYSTEM (FIX PRO LEVEL UP)
 // =========================
 async function addXP(userId, amount = 5) {
   const ref = db.ref(`users/${userId}/stats`);
 
-  const snapshot = await ref.get();
-  const stats = snapshot.val() || { xp: 0, level: 1 };
+  const snap = await ref.get();
+  const stats = snap.val() || { xp: 0, level: 1 };
 
   const currentXP = Number(stats.xp) || 0;
   const currentLevel = Number(stats.level) || 1;
   const add = Number(amount) || 0;
 
-  const xp = currentXP + add;
-  const level = Math.floor(xp / 100);
+  const newXP = currentXP + add;
+  const newLevel = Math.floor(newXP / 100);
+
+  const leveledUp = newLevel > currentLevel;
 
   await ref.update({
-    xp,
-    level
+    xp: newXP,
+    level: newLevel
   });
 
-  return { xp, level };
+  return {
+    xp: newXP,
+    level: newLevel,
+    oldLevel: currentLevel,
+    leveledUp
+  };
 }
 
 // =========================
@@ -116,8 +123,8 @@ async function updateLastSeen(userId) {
 async function addLog(userId, type, data = {}) {
   const ref = db.ref(`users/${userId}/logs`);
 
-  const snapshot = await ref.get();
-  let logs = snapshot.val() || [];
+  const snap = await ref.get();
+  let logs = snap.val() || [];
 
   logs.push({
     type,
@@ -136,21 +143,18 @@ async function addLog(userId, type, data = {}) {
 // 🧠 HELPERS
 // =========================
 async function getRecentMessages(userId) {
-  const snapshot = await db
-    .ref(`users/${userId}/memory/recentMessages`)
-    .get();
-
-  return snapshot.val() || [];
+  const snap = await db.ref(`users/${userId}/memory/recentMessages`).get();
+  return snap.val() || [];
 }
 
 async function getStats(userId) {
-  const snapshot = await db.ref(`users/${userId}/stats`).get();
-  return snapshot.val() || { xp: 0, level: 1 };
+  const snap = await db.ref(`users/${userId}/stats`).get();
+  return snap.val() || { xp: 0, level: 1 };
 }
 
 async function getProfile(userId) {
-  const snapshot = await db.ref(`users/${userId}/profile`).get();
-  return snapshot.val() || null;
+  const snap = await db.ref(`users/${userId}/profile`).get();
+  return snap.val() || null;
 }
 
 // =========================
