@@ -1,5 +1,5 @@
-const { db } = require('../../config/firebase');
 const { SlashCommandBuilder } = require('discord.js');
+const memory = require('../../modules/memory/firebaseMemory');
 
 const safeNumber = (v) => {
   const n = Number(v);
@@ -14,25 +14,22 @@ module.exports = {
   async execute(interaction) {
     const userId = interaction.user.id;
 
-    const doc = await db.collection('users').doc(userId).get();
+    // 🔥 OBTENER DESDE RTDB (FUENTE REAL)
+    const stats = await memory.getStats(userId);
 
-    if (!doc.exists) {
-      console.log(`[RANK] Usuario sin data: ${userId}`);
+    if (!stats) {
+      console.log(`[RANK] Usuario sin stats: ${userId}`);
       return interaction.reply("❌ Aún no tienes XP.");
     }
 
-    const data = doc.data() || {};
-
-    // 🔥 DEBUG LOG COMPLETO
+    // 🔥 DEBUG LIMPIO
     console.log("========== RANK DEBUG ==========");
     console.log("USER:", userId);
-    console.log("RAW DATA:", data);
-    console.log("XP RAW:", data.xp);
-    console.log("LEVEL RAW:", data.level);
+    console.log("STATS RAW:", stats);
 
-    const xp = safeNumber(data.xp);
+    const xp = safeNumber(stats.xp);
 
-    // 🔥 fuente única de verdad (IMPORTANTE)
+    // 🔥 ÚNICA VERDAD
     const level = Math.floor(xp / 100);
     const currentXP = xp % 100;
 
@@ -45,39 +42,43 @@ module.exports = {
       "█".repeat(filled) +
       "░".repeat(empty);
 
-    const embed = {
-      color: 0x00ff99,
-      title: "📊 Tu Nivel",
-      description: `<@${userId}>`,
-      fields: [
-        {
-          name: "🏆 Nivel",
-          value: `**${level}**`,
-          inline: true
-        },
-        {
-          name: "✨ XP Total",
-          value: `**${xp}**`,
-          inline: true
-        },
-        {
-          name: "📈 Progreso",
-          value: `\`${bar}\`\n${currentXP}/100 XP`,
-          inline: false
-        }
-      ],
-      thumbnail: {
-        url: interaction.user.displayAvatarURL()
-      }
-    };
-
+    // 🔥 DEBUG RESULTADO
     console.log("RANK RESULT:", {
-      level,
       xp,
+      level,
       currentXP,
       filled
     });
 
-    return interaction.reply({ embeds: [embed] });
+    return interaction.reply({
+      embeds: [
+        {
+          color: 0x00ff99,
+          title: "📊 Tu Nivel",
+          description: `<@${userId}>`,
+          fields: [
+            {
+              name: "🏆 Nivel",
+              value: `**${level}**`,
+              inline: true
+            },
+            {
+              name: "✨ XP Total",
+              value: `**${xp}**`,
+              inline: true
+            },
+            {
+              name: "📈 Progreso",
+              value: `\`${bar}\`\n${currentXP}/100 XP`,
+              inline: false
+            }
+          ],
+          thumbnail: {
+            url: interaction.user.displayAvatarURL()
+          },
+          timestamp: new Date()
+        }
+      ]
+    });
   }
 };

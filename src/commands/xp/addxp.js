@@ -1,12 +1,7 @@
-const { db } = require('../../config/firebase');
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const memory = require('../../modules/memory/firebaseMemory');
 
 const LEVEL_CHANNEL_ID = "1496236194109849670";
-
-const safeNumber = (v) => {
-  const n = Number(v);
-  return isNaN(n) ? 0 : n;
-};
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -28,39 +23,37 @@ module.exports = {
     const user = interaction.options.getUser('usuario');
     const xpToAdd = interaction.options.getInteger('xp');
 
-    const userRef = db.collection('users').doc(user.id);
-    const doc = await userRef.get();
+    // 🧠 asegurar usuario
+    let userData = await memory.getUser(user.id);
+    if (!userData) {
+      await memory.createUser(user);
+      userData = await memory.getUser(user.id);
+    }
 
-    const data = doc.exists ? (doc.data() || {}) : {};
+    const oldLevel = Number(userData?.stats?.level) || 0;
 
-    const currentXP = safeNumber(data.xp);
-    const currentLevel = safeNumber(data.level);
-    const addXP = safeNumber(xpToAdd);
+    // 🔥 usar tu sistema REAL
+    const result = await memory.addXP(user.id, xpToAdd);
 
-    const newXP = currentXP + addXP;
-    const newLevel = Math.floor(newXP / 100);
+    const newLevel = result.level;
 
-    await userRef.set({
-      xp: newXP,
-      level: newLevel,
-      updatedAt: Date.now()
-    }, { merge: true });
-
-    // 🔥 LEVEL UP CHECK
-    if (newLevel > currentLevel) {
+    // 🎉 LEVEL UP
+    if (newLevel > oldLevel) {
       try {
         const channel = await interaction.client.channels.fetch(LEVEL_CHANNEL_ID);
 
-        await channel.send(
-          `🎉 <@${user.id}> ha subido a **nivel ${newLevel}** 🚀`
-        );
+        if (channel) {
+          await channel.send(
+            `🎉 <@${user.id}> ha subido a **nivel ${newLevel}** 🚀`
+          );
+        }
       } catch (err) {
         console.error("LEVEL UP CHANNEL ERROR:", err);
       }
     }
 
     return interaction.reply(
-      `✅ Se añadieron **${addXP} XP** a <@${user.id}>`
+      `✅ Se añadieron **${xpToAdd} XP** a <@${user.id}>`
     );
   }
 };

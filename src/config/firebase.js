@@ -3,7 +3,7 @@ const admin = require("firebase-admin");
 let firebaseApp;
 
 // =========================
-// 🔥 INIT FIREBASE SAFE (RAILWAY / LOCAL)
+// 🔥 INIT FIREBASE SAFE
 // =========================
 function initFirebase() {
   if (firebaseApp) return firebaseApp;
@@ -26,9 +26,7 @@ function initFirebase() {
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
       privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
     }),
-
-    // 🔥 IMPORTANTE: solo si usas RTDB también
-    databaseURL: process.env.FIREBASE_DB_URL || undefined,
+    databaseURL: process.env.FIREBASE_DB_URL,
   });
 
   return firebaseApp;
@@ -37,13 +35,11 @@ function initFirebase() {
 initFirebase();
 
 // =========================
-// 🧠 EXPORTS FLEXIBLES
+// ✅ SOLO RTDB
 // =========================
-const db = admin.firestore(); // Firestore
-const rtdb = admin.database(); // Realtime DB (Fase 6)
+const db = admin.database();
 
 module.exports = {
   admin,
-  db,
-  rtdb,
+  db
 };
