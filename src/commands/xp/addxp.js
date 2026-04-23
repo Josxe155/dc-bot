@@ -1,7 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const memory = require('../../modules/memory/firebaseMemory');
-
-const LEVEL_CHANNEL_ID = "1496236194109849670";
+const { rtdb } = require('../../config/firebase');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -23,66 +21,28 @@ module.exports = {
     const user = interaction.options.getUser('usuario');
     const xpToAdd = interaction.options.getInteger('xp');
 
-    // 🧠 asegurar usuario
-    let userData = await memory.getUser(user.id);
+    const ref = rtdb.ref(`users/${user.id}/stats`);
+    const snap = await ref.get();
 
-    if (!userData) {
-      await memory.createUser(user);
-      userData = await memory.getUser(user.id);
+    let stats = snap.val();
+
+    if (!stats) {
+      stats = {
+        xp: 0,
+        level: 0,
+        lastMessageAt: 0
+      };
     }
 
-    const oldLevel = Number(userData?.stats?.level) || 0;
+    // 🔥 sumar XP directamente
+    const newXP = (stats.xp || 0) + xpToAdd;
+    const newLevel = Math.floor(newXP / 100);
 
-    // 🔥 usar tu sistema REAL
-    const result = await memory.addXP(user.id, xpToAdd);
-
-    const newLevel = result?.level || oldLevel;
-
-    // 🎉 LEVEL UP
-    if (newLevel > oldLevel) {
-      try {
-        const channel = await interaction.client.channels.fetch(LEVEL_CHANNEL_ID).catch(() => null);
-
-        if (channel && channel.isTextBased()) {
-          await channel.send({
-            embeds: [
-              {
-                color: 0x00ff99,
-
-                title: "🎉 LEVEL UP ADMIN",
-                description: `🚀 <@${user.id}> ha recibido XP`,
-
-                fields: [
-                  {
-                    name: "⚡ XP añadido",
-                    value: `**${xpToAdd} XP**`,
-                    inline: true
-                  },
-                  {
-                    name: "🏆 Nuevo nivel",
-                    value: `**${newLevel}**`,
-                    inline: true
-                  }
-                ],
-
-                thumbnail: {
-                  url: user.displayAvatarURL()
-                },
-
-                footer: {
-                  text: "🔥 Nexus Admin System"
-                },
-
-                timestamp: new Date()
-              }
-            ]
-          });
-        }
-
-      } catch (err) {
-        console.error("LEVEL UP CHANNEL ERROR:", err);
-      }
-    }
+    await ref.set({
+      xp: newXP,
+      level: newLevel,
+      lastMessageAt: stats.lastMessageAt || Date.now()
+    });
 
     return interaction.reply({
       content: `✅ Se añadieron **${xpToAdd} XP** a <@${user.id}>`,

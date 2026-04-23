@@ -36,6 +36,7 @@ async function handleXP(message, client) {
   const currentLevel = Number(stats.level) || 0;
   const lastMessageAt = Number(stats.lastMessageAt) || 0;
 
+  // 🚫 cooldown seguro
   if (now - lastMessageAt < COOLDOWN) return;
 
   const newXP = currentXP + XP_PER_MESSAGE;
@@ -44,16 +45,19 @@ async function handleXP(message, client) {
   const currentLevelXP = newXP % 100;
   const progressBar = createProgressBar(currentLevelXP, 100);
 
+  // 💾 RTDB update seguro (solo update, no overwrite completo)
   await rtdb.ref(`users/${userId}/stats`).update({
     xp: newXP,
     level: newLevel,
     lastMessageAt: now
   });
 
+  // 🎉 LEVEL UP
   if (newLevel > currentLevel) {
     try {
       const channel = await client.channels.fetch(LEVEL_CHANNEL_ID);
-      if (!channel || !channel.isTextBased()) return;
+
+      if (!channel?.isTextBased()) return;
 
       const embed = {
         color: getLevelColor(newLevel),
