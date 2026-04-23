@@ -5,13 +5,9 @@ const admin = require("firebase-admin");
 // =========================
 const firebaseConfig = require("../../config/firebase");
 
-function initFirebase() {
-  if (!admin.apps.length) {
-    admin.initializeApp(firebaseConfig);
-  }
+if (!admin.apps.length) {
+  admin.initializeApp(firebaseConfig);
 }
-
-initFirebase();
 
 const db = admin.database();
 
@@ -24,16 +20,29 @@ async function getUser(userId) {
 }
 
 // =========================
-// 🧠 CREAR USUARIO (FIXED)
+// 🧠 CREAR USUARIO (ROBUSTO)
 // =========================
 async function createUser(user) {
   const ref = db.ref(`users/${user.id}`);
-
   const snap = await ref.get();
 
-  // 🚫 SI YA EXISTE → NO HACER NADA
-  if (snap.exists()) return snap.val();
+  // 🔥 SI YA EXISTE → ASEGURAR stats
+  if (snap.exists()) {
+    const data = snap.val();
 
+    if (!data.stats) {
+      await ref.child("stats").set({
+        xp: 0,
+        level: 0,
+        lastMessageAt: 0
+      });
+      console.log("🛠️ stats reparado:", user.id);
+    }
+
+    return data;
+  }
+
+  // 🔥 CREAR NUEVO
   const baseData = {
     profile: {
       username: user.username,
@@ -59,7 +68,27 @@ async function createUser(user) {
   };
 
   await ref.set(baseData);
+  console.log("✅ usuario creado:", user.id);
+
   return baseData;
+}
+
+// =========================
+// 🔥 ASEGURAR STATS (CLAVE)
+// =========================
+async function ensureStats(userId) {
+  const ref = db.ref(`users/${userId}/stats`);
+  const snap = await ref.get();
+
+  if (!snap.exists()) {
+    await ref.set({
+      xp: 0,
+      level: 0,
+      lastMessageAt: 0
+    });
+
+    console.log("🛠️ stats creado:", userId);
+  }
 }
 
 // =========================
@@ -145,6 +174,7 @@ async function getProfile(userId) {
 module.exports = {
   getUser,
   createUser,
+  ensureStats, // 🔥 usar en messageCreate
   pushMessage,
   addXP, // ⚠️ no usar
   updateLastSeen,

@@ -10,7 +10,7 @@ function createProgressBar(current, total, size = 10) {
   return "█".repeat(progress) + "░".repeat(size - progress);
 }
 
-// 🎨 Color
+// 🎨 Color dinámico
 function getLevelColor(level) {
   if (level >= 20) return 0xff0000;
   if (level >= 10) return 0xffd700;
@@ -19,90 +19,99 @@ function getLevelColor(level) {
 }
 
 async function handleXP(message, client) {
+  const userId = message.author.id;
+  const now = Date.now();
+
+  const ref = rtdb.ref(`users/${userId}/stats`);
+
   try {
-    const userId = message.author.id;
-    const now = Date.now();
+    // 🔥 USAR TRANSACTION (ANTI BUG / ANTI RACE CONDITION)
+    let leveledUp = false;
+    let oldLevel = 0;
+    let newLevel = 0;
+    let newXP = 0;
+    let currentLevelXP = 0;
 
-    const ref = rtdb.ref(`users/${userId}/stats`);
+    await ref.transaction((stats) => {
 
-    let snapshot = await ref.get();
+      if (!stats) {
+        stats = {
+          xp: 0,
+          level: 0,
+          lastMessageAt: 0
+        };
+      }
 
-    // 🔥 SI NO EXISTE → CREAR
-    if (!snapshot.exists()) {
-      await ref.set({
-        xp: 0,
-        level: 0,
-        lastMessageAt: 0
-      });
+      // 🚫 COOLDOWN
+      if (now - (stats.lastMessageAt || 0) < COOLDOWN) {
+        return; // ❌ cancela transaction
+      }
 
-      snapshot = await ref.get();
-    }
+      oldLevel = stats.level || 0;
 
-    const stats = snapshot.val();
+      // 🔥 CALCULO
+      newXP = (stats.xp || 0) + XP_PER_MESSAGE;
+      newLevel = Math.floor(newXP / 100);
 
-    const currentXP = Number(stats.xp) || 0;
-    const currentLevel = Number(stats.level) || 0;
-    const lastMessageAt = Number(stats.lastMessageAt) || 0;
+      currentLevelXP = newXP % 100;
 
-    // 🚫 COOLDOWN
-    if (now - lastMessageAt < COOLDOWN) return;
+      leveledUp = newLevel > oldLevel;
 
-    // 🔥 CALCULO
-    const newXP = currentXP + XP_PER_MESSAGE;
-    const newLevel = Math.floor(newXP / 100);
-
-    const currentLevelXP = newXP % 100;
-    const progressBar = createProgressBar(currentLevelXP, 100);
-
-    // 💾 GUARDAR
-    await ref.update({
-      xp: newXP,
-      level: newLevel,
-      lastMessageAt: now
+      return {
+        xp: newXP,
+        level: newLevel,
+        lastMessageAt: now
+      };
     });
 
-    console.log("✅ XP OK:", userId, newXP, newLevel);
-    console.log("📍 PATH:", `users/${userId}/stats`);
+    // 🚫 Si no hubo cambio (cooldown)
+    if (newXP === 0) return;
+
+    console.log(`⚡ XP → ${userId} | XP: ${newXP} | LVL: ${newLevel}`);
 
     // 🎉 LEVEL UP
-    if (newLevel > currentLevel) {
-      const channel = await client.channels.fetch(LEVEL_CHANNEL_ID);
+    if (leveledUp) {
+      const channel = await client.channels.fetch(LEVEL_CHANNEL_ID).catch(() => null);
 
-      if (!channel || !channel.isTextBased()) {
+      if (!channel?.isTextBased()) {
         console.log("❌ Canal inválido");
         return;
       }
 
+      const progressBar = createProgressBar(currentLevelXP, 100);
+
       await channel.send({
-        content: `🎉 <@${userId}> subió a nivel **${newLevel}**`,
-        embeds: [{
-          color: getLevelColor(newLevel),
-          title: "🚀 LEVEL UP",
-          description: `🔥 ¡Nuevo nivel desbloqueado!`,
-          thumbnail: {
-            url: message.author.displayAvatarURL()
-          },
-          fields: [
-            {
-              name: "🏆 Nivel",
-              value: `**${currentLevel} → ${newLevel}**`,
-              inline: true
+        content: `🎉 <@${userId}>`,
+        embeds: [
+          {
+            color: getLevelColor(newLevel),
+            title: "🚀 LEVEL UP",
+            description: `🔥 Has subido a **nivel ${newLevel}**`,
+            thumbnail: {
+              url: message.author.displayAvatarURL({ dynamic: true })
             },
-            {
-              name: "✨ XP Total",
-              value: `**${newXP} XP**`,
-              inline: true
+            fields: [
+              {
+                name: "🏆 Nivel",
+                value: `\`${oldLevel} → ${newLevel}\``,
+                inline: true
+              },
+              {
+                name: "✨ XP Total",
+                value: `\`${newXP} XP\``,
+                inline: true
+              },
+              {
+                name: "📊 Progreso",
+                value: `\`${progressBar}\`\n${currentLevelXP}/100 XP`,
+              }
+            ],
+            footer: {
+              text: `Usuario: ${message.author.username}`
             },
-            {
-              name: "📊 Progreso",
-              value: `\`${progressBar}\`\n${currentLevelXP}/100 XP`
-            }
-          ],
-          footer: {
-            text: "Sigue activo para subir más niveles ⚡"
-          },
-          timestamp: new Date()
-        }]
+            timestamp: new Date()
+          }
+        ]
       });
     }
 

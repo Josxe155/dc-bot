@@ -25,34 +25,41 @@ module.exports = {
     const userId = message.author.id;
     const lower = contentRaw.toLowerCase();
 
-   // =========================
-// 🧠 MEMORY (SEPARADO)
-// =========================
-try {
-  let userData = await memory.getUser(userId);
+    // =========================
+    // 🧠 ASEGURAR USUARIO (FIX CLAVE)
+    // =========================
+    try {
+      let userData = await memory.getUser(userId);
 
-  if (!userData) {
-    await memory.createUser(message.author);
-  }
+      if (!userData) {
+        await memory.createUser(message.author);
+      }
 
-  await memory.pushMessage(userId, contentRaw, "user");
-  // await memory.updateLastSeen(userId);
+    } catch (err) {
+      console.error('🔥 createUser error:', err);
+    }
 
-} catch (err) {
-  console.error('🔥 Memory error:', err);
-}
+    // =========================
+    // ⭐ XP SYSTEM (PRIMERO)
+    // =========================
+    try {
+      if (message.guild) {
+        await handleXP(message, client);
+      }
+    } catch (err) {
+      console.error('💥 XP ERROR:', err);
+    }
 
-// =========================
-// ⭐ XP SYSTEM (AISLADO)
-// =========================
-try {
-  // 🔥 IMPORTANTE: evitar ejecutar XP en DMs si no quieres basura en DB
-  if (message.guild) {
-    await handleXP(message, client);
-  }
-} catch (err) {
-  console.error('💥 XP ERROR:', err);
-}
+    // =========================
+    // 🧠 MEMORY (DESPUÉS)
+    // =========================
+    try {
+      await memory.pushMessage(userId, contentRaw);
+      // ❌ NO tocar lastSeen (no afecta XP)
+      // await memory.updateLastSeen(userId);
+    } catch (err) {
+      console.error('🔥 Memory error:', err);
+    }
 
     // =========================
     // 💬 DM → IA
@@ -96,7 +103,7 @@ try {
 };
 
 // =========================
-// 🧠 IA CORE
+// 🧠 IA CORE (NO TOCADO)
 // =========================
 async function handleAI(message, client, userId, content) {
   try {
@@ -109,13 +116,13 @@ async function handleAI(message, client, userId, content) {
 
     if (wantsAudio) {
       await sendAudioReply(message, ai?.speechText || safeText);
-      await memory.pushMessage(userId, safeText, "assistant");
+      await memory.pushMessage(userId, safeText);
       return;
     }
 
     const reply = await message.reply(safeText);
 
-    await memory.pushMessage(userId, safeText, "assistant");
+    await memory.pushMessage(userId, safeText);
 
     return reply;
 
