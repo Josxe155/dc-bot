@@ -37,9 +37,9 @@ initFirebase();
 // =========================
 // ✅ SOLO RTDB
 // =========================
-const db = admin.database();
+const rtdb = admin.database();
 
 module.exports = {
   admin,
-  db
+  rtdb
 };
