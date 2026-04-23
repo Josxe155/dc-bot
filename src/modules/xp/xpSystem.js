@@ -19,40 +19,51 @@ function getLevelColor(level) {
 }
 
 async function handleXP(message, client) {
-  const userId = message.author.id;
-  const now = Date.now();
+  try {
+    const userId = message.author.id;
+    const now = Date.now();
 
-  const ref = rtdb.ref(`users/${userId}/stats`);
+    const ref = rtdb.ref(`users/${userId}/stats`);
 
-  const snapshot = await ref.get();
-  const stats = snapshot.exists()
-    ? snapshot.val()
-    : { xp: 0, level: 0, lastMessageAt: 0 };
+    // 🔥 OBTENER DATA
+    const snapshot = await ref.get();
 
-  const currentXP = Number(stats.xp) || 0;
-  const currentLevel = Number(stats.level) || 0;
-  const lastMessageAt = Number(stats.lastMessageAt) || 0;
+    // 🧠 CREAR SI NO EXISTE
+    if (!snapshot.exists()) {
+      await ref.set({
+        xp: 0,
+        level: 0,
+        lastMessageAt: 0
+      });
+    }
 
-  // 🚫 COOLDOWN
-  if (now - lastMessageAt < COOLDOWN) return;
+    const stats = snapshot.val() || {};
 
-  // 🔥 CALCULO REAL
-  const newXP = currentXP + XP_PER_MESSAGE;
-  const newLevel = Math.floor(newXP / 100);
+    const currentXP = Number(stats.xp) || 0;
+    const currentLevel = Number(stats.level) || 0;
+    const lastMessageAt = Number(stats.lastMessageAt) || 0;
 
-  const currentLevelXP = newXP % 100;
-  const progressBar = createProgressBar(currentLevelXP, 100);
+    // 🚫 COOLDOWN
+    if (now - lastMessageAt < COOLDOWN) return;
 
-  // 💾 GUARDAR
-  await ref.set({
-    xp: newXP,
-    level: newLevel,
-    lastMessageAt: now
-  });
+    // 🔥 CALCULO
+    const newXP = currentXP + XP_PER_MESSAGE;
+    const newLevel = Math.floor(newXP / 100);
 
-  // 🎉 LEVEL UP
-  if (newLevel > currentLevel) {
-    try {
+    const currentLevelXP = newXP % 100;
+    const progressBar = createProgressBar(currentLevelXP, 100);
+
+    // 💾 GUARDAR (FIX IMPORTANTE → update, no set)
+    await ref.update({
+      xp: newXP,
+      level: newLevel,
+      lastMessageAt: now
+    });
+
+    console.log("XP UPDATED:", userId, newXP, newLevel);
+
+    // 🎉 LEVEL UP
+    if (newLevel > currentLevel) {
       const channel = await client.channels.fetch(LEVEL_CHANNEL_ID);
 
       if (!channel || !channel.isTextBased()) {
@@ -61,40 +72,42 @@ async function handleXP(message, client) {
       }
 
       await channel.send({
-        content: `🎉 <@${userId}> subió a nivel **${newLevel}**`,
-        embeds: [{
-          color: getLevelColor(newLevel),
-          title: "🚀 LEVEL UP!",
-          description: `🔥 ¡Nuevo nivel desbloqueado!`,
-          thumbnail: {
-            url: message.author.displayAvatarURL()
-          },
-          fields: [
-            {
-              name: "🏆 Nivel",
-              value: `**${currentLevel} → ${newLevel}**`,
-              inline: true
+        content: `🎉 **LEVEL UP** • <@${userId}>`,
+        embeds: [
+          {
+            color: getLevelColor(newLevel),
+            title: "🚀 Nuevo nivel alcanzado",
+            description: `🔥 Has subido a **nivel ${newLevel}**`,
+            thumbnail: {
+              url: message.author.displayAvatarURL()
             },
-            {
-              name: "✨ XP Total",
-              value: `**${newXP} XP**`,
-              inline: true
+            fields: [
+              {
+                name: "🏆 Nivel",
+                value: `**${currentLevel} → ${newLevel}**`,
+                inline: true
+              },
+              {
+                name: "✨ XP Total",
+                value: `**${newXP} XP**`,
+                inline: true
+              },
+              {
+                name: "📊 Progreso",
+                value: `\`${progressBar}\`\n${currentLevelXP}/100 XP`
+              }
+            ],
+            footer: {
+              text: "Sigue activo para subir más niveles ⚡"
             },
-            {
-              name: "📊 Progreso",
-              value: `\`${progressBar}\`\n${currentLevelXP}/100 XP`
-            }
-          ],
-          footer: {
-            text: "Sigue activo para subir más niveles ⚡"
-          },
-          timestamp: new Date()
-        }]
+            timestamp: new Date()
+          }
+        ]
       });
-
-    } catch (err) {
-      console.error("❌ Error enviando level up:", err);
     }
+
+  } catch (err) {
+    console.error("💥 XP SYSTEM ERROR:", err);
   }
 }
 
