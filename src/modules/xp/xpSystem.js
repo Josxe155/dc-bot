@@ -1,4 +1,3 @@
-const memory = require('../modules/memory/firebaseMemory');
 const { rtdb } = require('../config/firebase');
 
 const COOLDOWN = 60000;
@@ -23,15 +22,9 @@ async function handleXP(message, client) {
   const userId = message.author.id;
   const now = Date.now();
 
-  // 🧠 USER DATA
-  let userData = await memory.getUser(userId);
-
-  if (!userData) {
-    await memory.createUser(message.author);
-    userData = await memory.getUser(userId);
-  }
-
-  const stats = userData.stats || {};
+  // 🔥 LEER DIRECTO DESDE RTDB (FIX CLAVE)
+  const snapshot = await rtdb.ref(`users/${userId}/stats`).get();
+  const stats = snapshot.val() || {};
 
   const currentXP = Number(stats.xp) || 0;
   const currentLevel = Number(stats.level) || 0;
@@ -47,7 +40,7 @@ async function handleXP(message, client) {
   const currentLevelXP = newXP % 100;
   const progressBar = createProgressBar(currentLevelXP, 100);
 
-  // 💾 GUARDAR (RTDB)
+  // 💾 GUARDAR
   await rtdb.ref(`users/${userId}/stats`).update({
     xp: newXP,
     level: newLevel,
@@ -62,21 +55,31 @@ async function handleXP(message, client) {
 
       const embed = {
         color: getLevelColor(newLevel),
+
         author: {
           name: message.author.username,
           icon_url: message.author.displayAvatarURL()
         },
-        title: "🎉 LEVEL UP!",
-        description: `🚀 <@${userId}> subió de nivel`,
+
+        title: "🚀 ¡SUBIDA DE NIVEL!",
+
+        description:
+          `🎉 ¡Felicidades <@${userId}>!\n` +
+          `Has alcanzado el nivel **${newLevel}** 🔥`,
+
+        thumbnail: {
+          url: message.author.displayAvatarURL({ dynamic: true })
+        },
+
         fields: [
           {
             name: "🏆 Nivel",
-            value: `**${currentLevel} → ${newLevel}**`,
+            value: `\`${currentLevel} ➜ ${newLevel}\``,
             inline: true
           },
           {
             name: "✨ XP Total",
-            value: `**${newXP} XP**`,
+            value: `\`${newXP} XP\``,
             inline: true
           },
           {
@@ -84,13 +87,17 @@ async function handleXP(message, client) {
             value: `\`${progressBar}\`\n${currentLevelXP}/100 XP`
           }
         ],
-        thumbnail: {
-          url: message.author.displayAvatarURL()
+
+        footer: {
+          text: "Sigue activo para subir más niveles 💪"
         },
+
         timestamp: new Date()
       };
 
       await channel.send({ embeds: [embed] });
+
+      console.log(`🎉 LEVEL UP → ${userId}: ${currentLevel} → ${newLevel}`);
 
     } catch (err) {
       console.error("❌ Error canal level:", err);
