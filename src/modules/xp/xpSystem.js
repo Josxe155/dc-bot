@@ -23,7 +23,6 @@ async function handleXP(message, client) {
   const userId = message.author.id;
   const now = Date.now();
 
-  // 🧠 USER DATA
   let userData = await memory.getUser(userId);
 
   if (!userData) {
@@ -37,24 +36,20 @@ async function handleXP(message, client) {
   const currentLevel = Number(stats.level) || 0;
   const lastMessageAt = Number(stats.lastMessageAt) || 0;
 
-  // 🚫 COOLDOWN
   if (now - lastMessageAt < COOLDOWN) return;
 
-  // 🔥 CALCULAR XP
   const newXP = currentXP + XP_PER_MESSAGE;
   const newLevel = Math.floor(newXP / 100);
 
   const currentLevelXP = newXP % 100;
   const progressBar = createProgressBar(currentLevelXP, 100);
 
-  // 💾 GUARDAR (RTDB)
   await rtdb.ref(`users/${userId}/stats`).update({
     xp: newXP,
     level: newLevel,
     lastMessageAt: now
   });
 
-  // 🎉 LEVEL UP
   if (newLevel > currentLevel) {
     try {
       const channel = await client.channels.fetch(LEVEL_CHANNEL_ID);
@@ -62,31 +57,40 @@ async function handleXP(message, client) {
 
       const embed = {
         color: getLevelColor(newLevel),
+
         author: {
-          name: message.author.username,
+          name: `🚀 ${message.author.username}`,
           icon_url: message.author.displayAvatarURL()
         },
+
         title: "🎉 LEVEL UP!",
-        description: `🚀 <@${userId}> subió de nivel`,
+        description: `✨ <@${userId}> ha subido de nivel`,
+
         fields: [
           {
-            name: "🏆 Nivel",
-            value: `**${currentLevel} → ${newLevel}**`,
+            name: "🏆 Nivel alcanzado",
+            value: `**${currentLevel} ➜ ${newLevel}**`,
             inline: true
           },
           {
-            name: "✨ XP Total",
-            value: `**${newXP} XP**`,
+            name: "⚡ XP Total",
+            value: `**${newXP.toLocaleString()} XP**`,
             inline: true
           },
           {
             name: "📊 Progreso",
-            value: `\`${progressBar}\`\n${currentLevelXP}/100 XP`
+            value: `\`${progressBar}\`\n**${currentLevelXP}/100 XP**`
           }
         ],
+
         thumbnail: {
           url: message.author.displayAvatarURL()
         },
+
+        footer: {
+          text: "🔥 Nexus XP System"
+        },
+
         timestamp: new Date()
       };
 
