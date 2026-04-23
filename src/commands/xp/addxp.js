@@ -25,6 +25,7 @@ module.exports = {
 
     // 🧠 asegurar usuario
     let userData = await memory.getUser(user.id);
+
     if (!userData) {
       await memory.createUser(user);
       userData = await memory.getUser(user.id);
@@ -35,25 +36,57 @@ module.exports = {
     // 🔥 usar tu sistema REAL
     const result = await memory.addXP(user.id, xpToAdd);
 
-    const newLevel = result.level;
+    const newLevel = result?.level || oldLevel;
 
     // 🎉 LEVEL UP
     if (newLevel > oldLevel) {
       try {
-        const channel = await interaction.client.channels.fetch(LEVEL_CHANNEL_ID);
+        const channel = await interaction.client.channels.fetch(LEVEL_CHANNEL_ID).catch(() => null);
 
-        if (channel) {
-          await channel.send(
-            `🎉 <@${user.id}> ha subido a **nivel ${newLevel}** 🚀`
-          );
+        if (channel && channel.isTextBased()) {
+          await channel.send({
+            embeds: [
+              {
+                color: 0x00ff99,
+
+                title: "🎉 LEVEL UP ADMIN",
+                description: `🚀 <@${user.id}> ha recibido XP`,
+
+                fields: [
+                  {
+                    name: "⚡ XP añadido",
+                    value: `**${xpToAdd} XP**`,
+                    inline: true
+                  },
+                  {
+                    name: "🏆 Nuevo nivel",
+                    value: `**${newLevel}**`,
+                    inline: true
+                  }
+                ],
+
+                thumbnail: {
+                  url: user.displayAvatarURL()
+                },
+
+                footer: {
+                  text: "🔥 Nexus Admin System"
+                },
+
+                timestamp: new Date()
+              }
+            ]
+          });
         }
+
       } catch (err) {
         console.error("LEVEL UP CHANNEL ERROR:", err);
       }
     }
 
-    return interaction.reply(
-      `✅ Se añadieron **${xpToAdd} XP** a <@${user.id}>`
-    );
+    return interaction.reply({
+      content: `✅ Se añadieron **${xpToAdd} XP** a <@${user.id}>`,
+      ephemeral: true
+    });
   }
 };
