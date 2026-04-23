@@ -52,15 +52,27 @@ async function handleXP(message, client) {
     lastMessageAt: now
   });
 
+  // 🔍 DEBUG GENERAL
+  console.log("━━━━━━━━━━━━━━━━━━");
+  console.log("⚡ XP SYSTEM DEBUG");
+  console.log("👤 User:", userId);
+  console.log("📈 XP:", currentXP, "→", newXP);
+  console.log("🏆 Level:", currentLevel, "→", newLevel);
+  console.log("━━━━━━━━━━━━━━━━━━");
+
   // 🎉 LEVEL UP
   if (newLevel > currentLevel) {
     try {
+      console.log("🚀 LEVEL UP DETECTADO, enviando mensaje...");
+
       const channel = await client.channels.fetch(LEVEL_CHANNEL_ID).catch(() => null);
 
       if (!channel || !channel.isTextBased()) {
         console.log("❌ Canal inválido o no encontrado");
         return;
       }
+
+      console.log("📡 Canal OK:", channel.id);
 
       const embed = {
         color: getLevelColor(newLevel),
@@ -102,6 +114,8 @@ async function handleXP(message, client) {
       };
 
       await channel.send({ embeds: [embed] });
+
+      console.log("✅ LEVEL UP ENVIADO CORRECTAMENTE");
 
     } catch (err) {
       console.error("❌ Error canal level:", err);
