@@ -4,13 +4,13 @@ const COOLDOWN = 60000;
 const XP_PER_MESSAGE = 10;
 const LEVEL_CHANNEL_ID = "1496236194109849670";
 
-// 📊 Barra de progreso
+// 📊 Barra
 function createProgressBar(current, total, size = 10) {
   const progress = Math.floor((current / total) * size);
   return "█".repeat(progress) + "░".repeat(size - progress);
 }
 
-// 🎨 Color por nivel
+// 🎨 Color
 function getLevelColor(level) {
   if (level >= 20) return 0xff0000;
   if (level >= 10) return 0xffd700;
@@ -22,9 +22,12 @@ async function handleXP(message, client) {
   const userId = message.author.id;
   const now = Date.now();
 
-  // 🔥 LEER DIRECTO DESDE RTDB (FIX CLAVE)
-  const snapshot = await rtdb.ref(`users/${userId}/stats`).get();
-  const stats = snapshot.val() || {};
+  const ref = rtdb.ref(`users/${userId}/stats`);
+
+  const snapshot = await ref.get();
+  const stats = snapshot.exists()
+    ? snapshot.val()
+    : { xp: 0, level: 0, lastMessageAt: 0 };
 
   const currentXP = Number(stats.xp) || 0;
   const currentLevel = Number(stats.level) || 0;
@@ -33,7 +36,7 @@ async function handleXP(message, client) {
   // 🚫 COOLDOWN
   if (now - lastMessageAt < COOLDOWN) return;
 
-  // 🔥 CALCULAR XP
+  // 🔥 CALCULO REAL
   const newXP = currentXP + XP_PER_MESSAGE;
   const newLevel = Math.floor(newXP / 100);
 
@@ -41,7 +44,7 @@ async function handleXP(message, client) {
   const progressBar = createProgressBar(currentLevelXP, 100);
 
   // 💾 GUARDAR
-  await rtdb.ref(`users/${userId}/stats`).update({
+  await ref.set({
     xp: newXP,
     level: newLevel,
     lastMessageAt: now
@@ -51,56 +54,46 @@ async function handleXP(message, client) {
   if (newLevel > currentLevel) {
     try {
       const channel = await client.channels.fetch(LEVEL_CHANNEL_ID);
-      if (!channel || !channel.isTextBased()) return;
 
-      const embed = {
-        color: getLevelColor(newLevel),
+      if (!channel || !channel.isTextBased()) {
+        console.log("❌ Canal inválido");
+        return;
+      }
 
-        author: {
-          name: message.author.username,
-          icon_url: message.author.displayAvatarURL()
-        },
-
-        title: "🚀 ¡SUBIDA DE NIVEL!",
-
-        description:
-          `🎉 ¡Felicidades <@${userId}>!\n` +
-          `Has alcanzado el nivel **${newLevel}** 🔥`,
-
-        thumbnail: {
-          url: message.author.displayAvatarURL({ dynamic: true })
-        },
-
-        fields: [
-          {
-            name: "🏆 Nivel",
-            value: `\`${currentLevel} ➜ ${newLevel}\``,
-            inline: true
+      await channel.send({
+        content: `🎉 <@${userId}> subió a nivel **${newLevel}**`,
+        embeds: [{
+          color: getLevelColor(newLevel),
+          title: "🚀 LEVEL UP!",
+          description: `🔥 ¡Nuevo nivel desbloqueado!`,
+          thumbnail: {
+            url: message.author.displayAvatarURL()
           },
-          {
-            name: "✨ XP Total",
-            value: `\`${newXP} XP\``,
-            inline: true
+          fields: [
+            {
+              name: "🏆 Nivel",
+              value: `**${currentLevel} → ${newLevel}**`,
+              inline: true
+            },
+            {
+              name: "✨ XP Total",
+              value: `**${newXP} XP**`,
+              inline: true
+            },
+            {
+              name: "📊 Progreso",
+              value: `\`${progressBar}\`\n${currentLevelXP}/100 XP`
+            }
+          ],
+          footer: {
+            text: "Sigue activo para subir más niveles ⚡"
           },
-          {
-            name: "📊 Progreso",
-            value: `\`${progressBar}\`\n${currentLevelXP}/100 XP`
-          }
-        ],
-
-        footer: {
-          text: "Sigue activo para subir más niveles 💪"
-        },
-
-        timestamp: new Date()
-      };
-
-      await channel.send({ embeds: [embed] });
-
-      console.log(`🎉 LEVEL UP → ${userId}: ${currentLevel} → ${newLevel}`);
+          timestamp: new Date()
+        }]
+      });
 
     } catch (err) {
-      console.error("❌ Error canal level:", err);
+      console.error("❌ Error enviando level up:", err);
     }
   }
 }
