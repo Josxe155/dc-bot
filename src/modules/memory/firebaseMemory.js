@@ -5,9 +5,13 @@ const admin = require("firebase-admin");
 // =========================
 const firebaseConfig = require("../../config/firebase");
 
-if (!admin.apps.length) {
-  admin.initializeApp(firebaseConfig);
+function initFirebase() {
+  if (!admin.apps.length) {
+    admin.initializeApp(firebaseConfig);
+  }
 }
+
+initFirebase();
 
 const db = admin.database();
 
@@ -20,26 +24,10 @@ async function getUser(userId) {
 }
 
 // =========================
-// 🧠 CREAR USUARIO (ROBUSTO)
+// 🧠 CREAR USUARIO
 // =========================
 async function createUser(user) {
   const ref = db.ref(`users/${user.id}`);
-  const snap = await ref.get();
-
-  if (snap.exists()) {
-    const data = snap.val();
-
-    if (!data.stats) {
-      await ref.child("stats").set({
-        xp: 0,
-        level: 0,
-        lastMessageAt: 0
-      });
-      console.log("🛠️ stats reparado:", user.id);
-    }
-
-    return data;
-  }
 
   const baseData = {
     profile: {
@@ -50,8 +38,7 @@ async function createUser(user) {
 
     stats: {
       xp: 0,
-      level: 0,
-      lastMessageAt: 0
+      level: 1,
     },
 
     moderation: {
@@ -66,27 +53,7 @@ async function createUser(user) {
   };
 
   await ref.set(baseData);
-  console.log("✅ usuario creado:", user.id);
-
   return baseData;
-}
-
-// =========================
-// 🔥 ASEGURAR STATS
-// =========================
-async function ensureStats(userId) {
-  const ref = db.ref(`users/${userId}/stats`);
-  const snap = await ref.get();
-
-  if (!snap.exists()) {
-    await ref.set({
-      xp: 0,
-      level: 0,
-      lastMessageAt: 0
-    });
-
-    console.log("🛠️ stats creado:", userId);
-  }
 }
 
 // =========================
@@ -111,24 +78,34 @@ async function pushMessage(userId, message) {
 }
 
 // =========================
-// 🚀 XP SYSTEM WRAPPER (MEJORADO)
+// 📊 XP SYSTEM (FIX PRO LEVEL UP)
 // =========================
-// 👉 AHORA YA NO DEPENDE DE PASAR xpSystem
-async function addXP(message, client) {
-  try {
-    // Import dinámico para evitar circular dependencies
-    const xpSystem = require("../xp/xpSystem");
+async function addXP(userId, amount = 5) {
+  const ref = db.ref(`users/${userId}/stats`);
 
-    if (!xpSystem || !xpSystem.handleXP) {
-      console.warn("⚠️ xpSystem no disponible");
-      return;
-    }
+  const snap = await ref.get();
+  const stats = snap.val() || { xp: 0, level: 1 };
 
-    await xpSystem.handleXP(message, client);
+  const currentXP = Number(stats.xp) || 0;
+  const currentLevel = Number(stats.level) || 1;
+  const add = Number(amount) || 0;
 
-  } catch (err) {
-    console.error("💥 Error en addXP:", err);
-  }
+  const newXP = currentXP + add;
+  const newLevel = Math.floor(newXP / 100);
+
+  const leveledUp = newLevel > currentLevel;
+
+  await ref.update({
+    xp: newXP,
+    level: newLevel
+  });
+
+  return {
+    xp: newXP,
+    level: newLevel,
+    oldLevel: currentLevel,
+    leveledUp
+  };
 }
 
 // =========================
@@ -172,7 +149,7 @@ async function getRecentMessages(userId) {
 
 async function getStats(userId) {
   const snap = await db.ref(`users/${userId}/stats`).get();
-  return snap.val() || { xp: 0, level: 0, lastMessageAt: 0 };
+  return snap.val() || { xp: 0, level: 1 };
 }
 
 async function getProfile(userId) {
@@ -186,9 +163,8 @@ async function getProfile(userId) {
 module.exports = {
   getUser,
   createUser,
-  ensureStats,
   pushMessage,
-  addXP, // ✅ limpio y usable
+  addXP,
   updateLastSeen,
   addLog,
   getRecentMessages,

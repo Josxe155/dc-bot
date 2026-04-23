@@ -3,11 +3,8 @@ const { textToSpeech } = require('../modules/ai/tts');
 const log = require('../utils/logger');
 const fs = require('fs');
 
-// 🧠 FIREBASE MEMORY
+// 🧠 FIREBASE RTDB MEMORY (FASE 6)
 const memory = require('../modules/memory/firebaseMemory');
-
-// 🔥 XP SYSTEM REAL
-const { handleXP } = require('../modules/xp/xpSystem');
 
 module.exports = {
   name: 'messageCreate',
@@ -26,39 +23,27 @@ module.exports = {
     const lower = contentRaw.toLowerCase();
 
     // =========================
-    // 🧠 ASEGURAR USUARIO (FIX CLAVE)
+    // 🧠 FIREBASE MEMORY + XP
     // =========================
     try {
       let userData = await memory.getUser(userId);
 
       if (!userData) {
         await memory.createUser(message.author);
+        userData = await memory.getUser(userId);
       }
 
-    } catch (err) {
-      console.error('🔥 createUser error:', err);
-    }
+      // 💬 guardar mensaje
+      await memory.pushMessage(userId, contentRaw, "user");
 
-    // =========================
-    // ⭐ XP SYSTEM (PRIMERO)
-    // =========================
-    try {
-      if (message.guild) {
-        await handleXP(message, client);
-      }
-    } catch (err) {
-      console.error('💥 XP ERROR:', err);
-    }
+      // ⭐ XP SYSTEM (RTDB ONLY)
+      await memory.addXP(userId, 5);
 
-    // =========================
-    // 🧠 MEMORY (DESPUÉS)
-    // =========================
-    try {
-      await memory.pushMessage(userId, contentRaw);
-      // ❌ NO tocar lastSeen (no afecta XP)
-      // await memory.updateLastSeen(userId);
+      // ⏱ last seen
+      await memory.updateLastSeen(userId);
+
     } catch (err) {
-      console.error('🔥 Memory error:', err);
+      console.error('🔥 Firebase Memory error:', err);
     }
 
     // =========================
@@ -103,7 +88,7 @@ module.exports = {
 };
 
 // =========================
-// 🧠 IA CORE (NO TOCADO)
+// 🧠 IA CORE
 // =========================
 async function handleAI(message, client, userId, content) {
   try {
@@ -116,13 +101,13 @@ async function handleAI(message, client, userId, content) {
 
     if (wantsAudio) {
       await sendAudioReply(message, ai?.speechText || safeText);
-      await memory.pushMessage(userId, safeText);
+      await memory.pushMessage(userId, safeText, "assistant");
       return;
     }
 
     const reply = await message.reply(safeText);
 
-    await memory.pushMessage(userId, safeText);
+    await memory.pushMessage(userId, safeText, "assistant");
 
     return reply;
 
@@ -146,7 +131,8 @@ function detectAudioRequest(text) {
     'responde en audio'
   ];
 
-  return triggers.some(t => text.toLowerCase().includes(t));
+  const lower = text.toLowerCase();
+  return triggers.some(t => lower.includes(t));
 }
 
 // =========================
