@@ -25,21 +25,8 @@ async function handleXP(message, client) {
 
     const ref = rtdb.ref(`users/${userId}/stats`);
 
-    // 🔥 OBTENER DATA
-let snapshot = await ref.get();
-
-if (!snapshot.exists()) {
-  await ref.set({
-    xp: 0,
-    level: 0,
-    lastMessageAt: 0
-  });
-
-  // 🔥 RECARGAR DATA
-  snapshot = await ref.get();
-}
-
-const stats = snapshot.val() || {};
+    const snapshot = await ref.get();
+    const stats = snapshot.val() || {};
 
     const currentXP = Number(stats.xp) || 0;
     const currentLevel = Number(stats.level) || 0;
@@ -55,14 +42,14 @@ const stats = snapshot.val() || {};
     const currentLevelXP = newXP % 100;
     const progressBar = createProgressBar(currentLevelXP, 100);
 
-    // 💾 GUARDAR (FIX IMPORTANTE → update, no set)
+    // 💾 GUARDAR (SIEMPRE UPDATE)
     await ref.update({
       xp: newXP,
       level: newLevel,
       lastMessageAt: now
     });
 
-    console.log("XP UPDATED:", userId, newXP, newLevel);
+    console.log("✅ XP OK:", userId, newXP, newLevel);
 
     // 🎉 LEVEL UP
     if (newLevel > currentLevel) {
@@ -74,37 +61,35 @@ const stats = snapshot.val() || {};
       }
 
       await channel.send({
-        content: `🎉 **LEVEL UP** • <@${userId}>`,
-        embeds: [
-          {
-            color: getLevelColor(newLevel),
-            title: "🚀 Nuevo nivel alcanzado",
-            description: `🔥 Has subido a **nivel ${newLevel}**`,
-            thumbnail: {
-              url: message.author.displayAvatarURL()
+        content: `🎉 <@${userId}> subió a nivel **${newLevel}**`,
+        embeds: [{
+          color: getLevelColor(newLevel),
+          title: "🚀 LEVEL UP",
+          description: `🔥 ¡Nuevo nivel desbloqueado!`,
+          thumbnail: {
+            url: message.author.displayAvatarURL()
+          },
+          fields: [
+            {
+              name: "🏆 Nivel",
+              value: `**${currentLevel} → ${newLevel}**`,
+              inline: true
             },
-            fields: [
-              {
-                name: "🏆 Nivel",
-                value: `**${currentLevel} → ${newLevel}**`,
-                inline: true
-              },
-              {
-                name: "✨ XP Total",
-                value: `**${newXP} XP**`,
-                inline: true
-              },
-              {
-                name: "📊 Progreso",
-                value: `\`${progressBar}\`\n${currentLevelXP}/100 XP`
-              }
-            ],
-            footer: {
-              text: "Sigue activo para subir más niveles ⚡"
+            {
+              name: "✨ XP Total",
+              value: `**${newXP} XP**`,
+              inline: true
             },
-            timestamp: new Date()
-          }
-        ]
+            {
+              name: "📊 Progreso",
+              value: `\`${progressBar}\`\n${currentLevelXP}/100 XP`
+            }
+          ],
+          footer: {
+            text: "Sigue activo para subir más niveles ⚡"
+          },
+          timestamp: new Date()
+        }]
       });
     }
 

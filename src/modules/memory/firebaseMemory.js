@@ -24,10 +24,15 @@ async function getUser(userId) {
 }
 
 // =========================
-// 🧠 CREAR USUARIO
+// 🧠 CREAR USUARIO (FIXED)
 // =========================
 async function createUser(user) {
   const ref = db.ref(`users/${user.id}`);
+
+  const snap = await ref.get();
+
+  // 🚫 SI YA EXISTE → NO HACER NADA
+  if (snap.exists()) return snap.val();
 
   const baseData = {
     profile: {
@@ -38,7 +43,8 @@ async function createUser(user) {
 
     stats: {
       xp: 0,
-      level: 1,
+      level: 0,
+      lastMessageAt: 0
     },
 
     moderation: {
@@ -78,34 +84,10 @@ async function pushMessage(userId, message) {
 }
 
 // =========================
-// 📊 XP SYSTEM (FIX PRO LEVEL UP)
+// 🚫 DESACTIVADO (NO USAR)
 // =========================
-async function addXP(userId, amount = 5) {
-  const ref = db.ref(`users/${userId}/stats`);
-
-  const snap = await ref.get();
-  const stats = snap.val() || { xp: 0, level: 1 };
-
-  const currentXP = Number(stats.xp) || 0;
-  const currentLevel = Number(stats.level) || 1;
-  const add = Number(amount) || 0;
-
-  const newXP = currentXP + add;
-  const newLevel = Math.floor(newXP / 100);
-
-  const leveledUp = newLevel > currentLevel;
-
-  await ref.update({
-    xp: newXP,
-    level: newLevel
-  });
-
-  return {
-    xp: newXP,
-    level: newLevel,
-    oldLevel: currentLevel,
-    leveledUp
-  };
+async function addXP() {
+  console.warn("⚠️ NO uses addXP de memory, usa xpSystem");
 }
 
 // =========================
@@ -149,7 +131,7 @@ async function getRecentMessages(userId) {
 
 async function getStats(userId) {
   const snap = await db.ref(`users/${userId}/stats`).get();
-  return snap.val() || { xp: 0, level: 1 };
+  return snap.val() || { xp: 0, level: 0, lastMessageAt: 0 };
 }
 
 async function getProfile(userId) {
@@ -164,7 +146,7 @@ module.exports = {
   getUser,
   createUser,
   pushMessage,
-  addXP,
+  addXP, // ⚠️ no usar
   updateLastSeen,
   addLog,
   getRecentMessages,

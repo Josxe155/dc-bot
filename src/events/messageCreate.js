@@ -46,7 +46,10 @@ try {
 // ⭐ XP SYSTEM (AISLADO)
 // =========================
 try {
-  await handleXP(message, client);
+  // 🔥 IMPORTANTE: evitar ejecutar XP en DMs si no quieres basura en DB
+  if (message.guild) {
+    await handleXP(message, client);
+  }
 } catch (err) {
   console.error('💥 XP ERROR:', err);
 }
