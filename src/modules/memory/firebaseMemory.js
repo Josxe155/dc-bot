@@ -111,18 +111,23 @@ async function pushMessage(userId, message) {
 }
 
 // =========================
-// 🚀 XP WRAPPER (CORREGIDO)
+// 🚀 XP SYSTEM WRAPPER (MEJORADO)
 // =========================
-async function addXP(message, client, xpSystem) {
-  if (!xpSystem || !xpSystem.handleXP) {
-    console.warn("⚠️ xpSystem no proporcionado en addXP");
-    return;
-  }
-
+// 👉 AHORA YA NO DEPENDE DE PASAR xpSystem
+async function addXP(message, client) {
   try {
+    // Import dinámico para evitar circular dependencies
+    const xpSystem = require("../xp/xpSystem");
+
+    if (!xpSystem || !xpSystem.handleXP) {
+      console.warn("⚠️ xpSystem no disponible");
+      return;
+    }
+
     await xpSystem.handleXP(message, client);
+
   } catch (err) {
-    console.error("💥 Error en addXP wrapper:", err);
+    console.error("💥 Error en addXP:", err);
   }
 }
 
@@ -183,7 +188,7 @@ module.exports = {
   createUser,
   ensureStats,
   pushMessage,
-  addXP, // ✅ ahora sí usable
+  addXP, // ✅ limpio y usable
   updateLastSeen,
   addLog,
   getRecentMessages,
