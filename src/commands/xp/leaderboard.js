@@ -1,5 +1,5 @@
+const { rtdb } = require('../../config/firebase');
 const { SlashCommandBuilder } = require('discord.js');
-const db = require('../../config/firebase').rtdb;
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -7,10 +7,12 @@ module.exports = {
     .setDescription('Top usuarios con más XP'),
 
   async execute(interaction) {
-    const snapshot = await db.ref('users').get();
+    await interaction.deferReply(); // 🔥 evita errores si tarda
+
+    const snapshot = await rtdb.ref('users').get();
 
     if (!snapshot.exists()) {
-      return interaction.reply("❌ No hay datos.");
+      return interaction.editReply("❌ No hay datos.");
     }
 
     const users = snapshot.val();
@@ -18,25 +20,39 @@ module.exports = {
     const sorted = Object.entries(users)
       .map(([id, data]) => ({
         id,
-        xp: Number(data?.stats?.xp || 0)
+        xp: Number(data?.stats?.xp) || 0,
+        level: Number(data?.stats?.level) || 0
       }))
+      .filter(u => u.xp > 0) // 🔥 evita basura
       .sort((a, b) => b.xp - a.xp)
       .slice(0, 10);
 
+    if (sorted.length === 0) {
+      return interaction.editReply("❌ No hay usuarios con XP.");
+    }
+
+    // 🏆 MEDALLAS
+    const medals = ["🥇", "🥈", "🥉"];
+
     let description = "";
 
-    sorted.forEach((user, i) => {
-      description += `**${i + 1}.** <@${user.id}> — ${user.xp} XP\n`;
+    sorted.forEach((user, index) => {
+      const medal = medals[index] || `**${index + 1}.**`;
+
+      description += `${medal} <@${user.id}>\n` +
+                     `└ ✨ \`${user.xp} XP\` • 🏆 Nivel ${user.level}\n\n`;
     });
 
-    return interaction.reply({
-      embeds: [
-        {
-          color: 0xffd700,
-          title: "🏆 Leaderboard",
-          description
-        }
-      ]
-    });
+    const embed = {
+      color: 0xffd700,
+      title: "🏆 Leaderboard Global",
+      description,
+      footer: {
+        text: `Solicitado por ${interaction.user.username}`
+      },
+      timestamp: new Date()
+    };
+
+    return interaction.editReply({ embeds: [embed] });
   }
 };
