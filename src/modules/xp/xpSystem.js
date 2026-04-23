@@ -25,8 +25,20 @@ async function handleXP(message, client) {
 
     const ref = rtdb.ref(`users/${userId}/stats`);
 
-    const snapshot = await ref.get();
-    const stats = snapshot.val() || {};
+    let snapshot = await ref.get();
+
+    // 🔥 SI NO EXISTE → CREAR
+    if (!snapshot.exists()) {
+      await ref.set({
+        xp: 0,
+        level: 0,
+        lastMessageAt: 0
+      });
+
+      snapshot = await ref.get();
+    }
+
+    const stats = snapshot.val();
 
     const currentXP = Number(stats.xp) || 0;
     const currentLevel = Number(stats.level) || 0;
@@ -42,7 +54,7 @@ async function handleXP(message, client) {
     const currentLevelXP = newXP % 100;
     const progressBar = createProgressBar(currentLevelXP, 100);
 
-    // 💾 GUARDAR (SIEMPRE UPDATE)
+    // 💾 GUARDAR
     await ref.update({
       xp: newXP,
       level: newLevel,
@@ -50,6 +62,7 @@ async function handleXP(message, client) {
     });
 
     console.log("✅ XP OK:", userId, newXP, newLevel);
+    console.log("📍 PATH:", `users/${userId}/stats`);
 
     // 🎉 LEVEL UP
     if (newLevel > currentLevel) {
