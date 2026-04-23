@@ -7,16 +7,8 @@ const LEVEL_CHANNEL_ID = "1496236194109849670";
 
 // 📊 Barra de progreso
 function createProgressBar(current, total, size = 10) {
-  const progress = Math.floor((current / total) * size);
+  const progress = Math.max(0, Math.min(size, Math.floor((current / total) * size)));
   return "█".repeat(progress) + "░".repeat(size - progress);
-}
-
-// 🎨 Color por nivel
-function getLevelColor(level) {
-  if (level >= 20) return 0xff0000;
-  if (level >= 10) return 0xffd700;
-  if (level >= 5) return 0x00bfff;
-  return 0x00ff99;
 }
 
 async function handleXP(message, client) {
@@ -30,7 +22,7 @@ async function handleXP(message, client) {
     userData = await memory.getUser(userId);
   }
 
-  const stats = userData.stats || {};
+  const stats = userData?.stats || {};
 
   const currentXP = Number(stats.xp) || 0;
   const currentLevel = Number(stats.level) || 0;
@@ -52,73 +44,40 @@ async function handleXP(message, client) {
     lastMessageAt: now
   });
 
-  // 🔍 DEBUG GENERAL
+  // 🔍 DEBUG
   console.log("━━━━━━━━━━━━━━━━━━");
-  console.log("⚡ XP SYSTEM DEBUG");
-  console.log("👤 User:", userId);
-  console.log("📈 XP:", currentXP, "→", newXP);
-  console.log("🏆 Level:", currentLevel, "→", newLevel);
+  console.log("⚡ XP SYSTEM");
+  console.log("👤", userId);
+  console.log("XP:", currentXP, "→", newXP);
+  console.log("LVL:", currentLevel, "→", newLevel);
   console.log("━━━━━━━━━━━━━━━━━━");
 
   // 🎉 LEVEL UP
   if (newLevel > currentLevel) {
     try {
-      console.log("🚀 LEVEL UP DETECTADO, enviando mensaje...");
-
       const channel = await client.channels.fetch(LEVEL_CHANNEL_ID).catch(() => null);
 
       if (!channel || !channel.isTextBased()) {
-        console.log("❌ Canal inválido o no encontrado");
+        console.log("❌ Canal inválido");
         return;
       }
 
-      console.log("📡 Canal OK:", channel.id);
+      const levelMessage =
+`🎉 **LEVEL UP!**
+━━━━━━━━━━━━━━━━━━
+🚀 Usuario: <@${userId}>
+🏆 Nivel: ${currentLevel} ➜ ${newLevel}
+⚡ XP Total: ${newXP.toLocaleString()}
+📊 Progreso: ${currentLevelXP}/100 XP
+━━━━━━━━━━━━━━━━━━
+🔥 ¡Sigue así!`;
 
-      const embed = {
-        color: getLevelColor(newLevel),
+      await channel.send({ content: levelMessage });
 
-        author: {
-          name: `🚀 ${message.author.username}`,
-          icon_url: message.author.displayAvatarURL()
-        },
-
-        title: "🎉 LEVEL UP!",
-        description: `✨ <@${userId}> ha subido de nivel`,
-
-        fields: [
-          {
-            name: "🏆 Nivel alcanzado",
-            value: `**${currentLevel} ➜ ${newLevel}**`,
-            inline: true
-          },
-          {
-            name: "⚡ XP Total",
-            value: `**${newXP.toLocaleString()} XP**`,
-            inline: true
-          },
-          {
-            name: "📊 Progreso",
-            value: `\`${progressBar}\`\n**${currentLevelXP}/100 XP**`
-          }
-        ],
-
-        thumbnail: {
-          url: message.author.displayAvatarURL()
-        },
-
-        footer: {
-          text: "🔥 Nexus XP System"
-        },
-
-        timestamp: new Date()
-      };
-
-      await channel.send({ embeds: [embed] });
-
-      console.log("✅ LEVEL UP ENVIADO CORRECTAMENTE");
+      console.log("✅ LEVEL UP ENVIADO (TEXTO PLANO)");
 
     } catch (err) {
-      console.error("❌ Error canal level:", err);
+      console.error("❌ Error level:", err);
     }
   }
 }
