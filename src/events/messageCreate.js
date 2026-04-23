@@ -36,7 +36,7 @@ try {
   }
 
   await memory.pushMessage(userId, contentRaw, "user");
-  await memory.updateLastSeen(userId);
+  // await memory.updateLastSeen(userId);
 
 } catch (err) {
   console.error('🔥 Memory error:', err);
