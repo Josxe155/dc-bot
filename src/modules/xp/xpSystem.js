@@ -1,4 +1,4 @@
-const { rtdb } = require('../config/firebase');
+const { rtdb } = require('../../config/firebase');
 
 const COOLDOWN = 60000;
 const XP_PER_MESSAGE = 10;

@@ -3,8 +3,11 @@ const { textToSpeech } = require('../modules/ai/tts');
 const log = require('../utils/logger');
 const fs = require('fs');
 
-// 🧠 FIREBASE RTDB MEMORY (FASE 6)
+// 🧠 FIREBASE MEMORY
 const memory = require('../modules/memory/firebaseMemory');
+
+// 🔥 XP SYSTEM REAL
+const { handleXP } = require('../modules/xp/xpSystem');
 
 module.exports = {
   name: 'messageCreate',
@@ -30,14 +33,13 @@ module.exports = {
 
       if (!userData) {
         await memory.createUser(message.author);
-        userData = await memory.getUser(userId);
       }
 
       // 💬 guardar mensaje
       await memory.pushMessage(userId, contentRaw, "user");
 
-      // ⭐ XP SYSTEM (RTDB ONLY)
-      await memory.addXP(userId, 5);
+      // 🔥 XP SYSTEM (EL BUENO)
+      await handleXP(message, client);
 
       // ⏱ last seen
       await memory.updateLastSeen(userId);
@@ -131,8 +133,7 @@ function detectAudioRequest(text) {
     'responde en audio'
   ];
 
-  const lower = text.toLowerCase();
-  return triggers.some(t => lower.includes(t));
+  return triggers.some(t => text.toLowerCase().includes(t));
 }
 
 // =========================
