@@ -26,7 +26,6 @@ async function createUser(user) {
   const ref = db.ref(`users/${user.id}`);
   const snap = await ref.get();
 
-  // 🔥 SI YA EXISTE → ASEGURAR stats
   if (snap.exists()) {
     const data = snap.val();
 
@@ -42,7 +41,6 @@ async function createUser(user) {
     return data;
   }
 
-  // 🔥 CREAR NUEVO
   const baseData = {
     profile: {
       username: user.username,
@@ -74,7 +72,7 @@ async function createUser(user) {
 }
 
 // =========================
-// 🔥 ASEGURAR STATS (CLAVE)
+// 🔥 ASEGURAR STATS
 // =========================
 async function ensureStats(userId) {
   const ref = db.ref(`users/${userId}/stats`);
@@ -113,10 +111,19 @@ async function pushMessage(userId, message) {
 }
 
 // =========================
-// 🚫 DESACTIVADO (NO USAR)
+// 🚀 XP WRAPPER (CORREGIDO)
 // =========================
-async function addXP() {
-  console.warn("⚠️ NO uses addXP de memory, usa xpSystem");
+async function addXP(message, client, xpSystem) {
+  if (!xpSystem || !xpSystem.handleXP) {
+    console.warn("⚠️ xpSystem no proporcionado en addXP");
+    return;
+  }
+
+  try {
+    await xpSystem.handleXP(message, client);
+  } catch (err) {
+    console.error("💥 Error en addXP wrapper:", err);
+  }
 }
 
 // =========================
@@ -174,9 +181,9 @@ async function getProfile(userId) {
 module.exports = {
   getUser,
   createUser,
-  ensureStats, // 🔥 usar en messageCreate
+  ensureStats,
   pushMessage,
-  addXP, // ⚠️ no usar
+  addXP, // ✅ ahora sí usable
   updateLastSeen,
   addLog,
   getRecentMessages,

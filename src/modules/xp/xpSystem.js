@@ -4,13 +4,17 @@ const COOLDOWN = 60000;
 const XP_PER_MESSAGE = 10;
 const LEVEL_CHANNEL_ID = "1496236194109849670";
 
-// 📊 Barra
+// 📊 Barra de progreso
 function createProgressBar(current, total, size = 10) {
-  const progress = Math.floor((current / total) * size);
-  return "█".repeat(progress) + "░".repeat(size - progress);
+  if (total <= 0) return "░".repeat(size);
+
+  const percent = current / total;
+  const filled = Math.round(percent * size);
+
+  return "█".repeat(filled) + "░".repeat(size - filled);
 }
 
-// 🎨 Color dinámico
+// 🎨 Color dinámico por nivel
 function getLevelColor(level) {
   if (level >= 20) return 0xff0000;
   if (level >= 10) return 0xffd700;
@@ -25,15 +29,14 @@ async function handleXP(message, client) {
   const ref = rtdb.ref(`users/${userId}/stats`);
 
   try {
-    // 🔥 USAR TRANSACTION (ANTI BUG / ANTI RACE CONDITION)
     let leveledUp = false;
+
     let oldLevel = 0;
     let newLevel = 0;
     let newXP = 0;
     let currentLevelXP = 0;
 
-    await ref.transaction((stats) => {
-
+    const result = await ref.transaction((stats) => {
       if (!stats) {
         stats = {
           xp: 0,
@@ -42,18 +45,18 @@ async function handleXP(message, client) {
         };
       }
 
-      // 🚫 COOLDOWN
+      // 🚫 cooldown anti spam XP
       if (now - (stats.lastMessageAt || 0) < COOLDOWN) {
-        return; // ❌ cancela transaction
+        return; // cancela transaction
       }
 
+      const oldXP = stats.xp || 0;
       oldLevel = stats.level || 0;
 
-      // 🔥 CALCULO
-      newXP = (stats.xp || 0) + XP_PER_MESSAGE;
+      newXP = oldXP + XP_PER_MESSAGE;
       newLevel = Math.floor(newXP / 100);
 
-      currentLevelXP = newXP % 100;
+      currentLevelXP = newXP - (newLevel * 100);
 
       leveledUp = newLevel > oldLevel;
 
@@ -64,8 +67,8 @@ async function handleXP(message, client) {
       };
     });
 
-    // 🚫 Si no hubo cambio (cooldown)
-    if (newXP === 0) return;
+    // 🚫 si no se actualizó (cooldown)
+    if (!result.committed) return;
 
     console.log(`⚡ XP → ${userId} | XP: ${newXP} | LVL: ${newLevel}`);
 
@@ -73,10 +76,7 @@ async function handleXP(message, client) {
     if (leveledUp) {
       const channel = await client.channels.fetch(LEVEL_CHANNEL_ID).catch(() => null);
 
-      if (!channel?.isTextBased()) {
-        console.log("❌ Canal inválido");
-        return;
-      }
+      if (!channel?.isTextBased()) return;
 
       const progressBar = createProgressBar(currentLevelXP, 100);
 
@@ -103,7 +103,7 @@ async function handleXP(message, client) {
               },
               {
                 name: "📊 Progreso",
-                value: `\`${progressBar}\`\n${currentLevelXP}/100 XP`,
+                value: `\`${progressBar}\`\n${currentLevelXP}/100 XP`
               }
             ],
             footer: {
