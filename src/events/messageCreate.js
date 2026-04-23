@@ -25,28 +25,31 @@ module.exports = {
     const userId = message.author.id;
     const lower = contentRaw.toLowerCase();
 
-    // =========================
-    // 🧠 FIREBASE MEMORY + XP
-    // =========================
-    try {
-      let userData = await memory.getUser(userId);
+   // =========================
+// 🧠 MEMORY (SEPARADO)
+// =========================
+try {
+  let userData = await memory.getUser(userId);
 
-      if (!userData) {
-        await memory.createUser(message.author);
-      }
+  if (!userData) {
+    await memory.createUser(message.author);
+  }
 
-      // 💬 guardar mensaje
-      await memory.pushMessage(userId, contentRaw, "user");
+  await memory.pushMessage(userId, contentRaw, "user");
+  await memory.updateLastSeen(userId);
 
-      // 🔥 XP SYSTEM (EL BUENO)
-      await handleXP(message, client);
+} catch (err) {
+  console.error('🔥 Memory error:', err);
+}
 
-      // ⏱ last seen
-      await memory.updateLastSeen(userId);
-
-    } catch (err) {
-      console.error('🔥 Firebase Memory error:', err);
-    }
+// =========================
+// ⭐ XP SYSTEM (AISLADO)
+// =========================
+try {
+  await handleXP(message, client);
+} catch (err) {
+  console.error('💥 XP ERROR:', err);
+}
 
     // =========================
     // 💬 DM → IA

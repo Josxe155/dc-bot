@@ -26,18 +26,20 @@ async function handleXP(message, client) {
     const ref = rtdb.ref(`users/${userId}/stats`);
 
     // 🔥 OBTENER DATA
-    const snapshot = await ref.get();
+let snapshot = await ref.get();
 
-    // 🧠 CREAR SI NO EXISTE
-    if (!snapshot.exists()) {
-      await ref.set({
-        xp: 0,
-        level: 0,
-        lastMessageAt: 0
-      });
-    }
+if (!snapshot.exists()) {
+  await ref.set({
+    xp: 0,
+    level: 0,
+    lastMessageAt: 0
+  });
 
-    const stats = snapshot.val() || {};
+  // 🔥 RECARGAR DATA
+  snapshot = await ref.get();
+}
+
+const stats = snapshot.val() || {};
 
     const currentXP = Number(stats.xp) || 0;
     const currentLevel = Number(stats.level) || 0;
