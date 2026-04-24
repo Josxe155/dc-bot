@@ -36,9 +36,6 @@ module.exports = {
       // 💬 guardar mensaje
       await memory.pushMessage(userId, contentRaw, "user");
 
-      // ⭐ XP SYSTEM (RTDB ONLY)
-      await memory.addXP(userId, 5);
-
       // ⏱ last seen
       await memory.updateLastSeen(userId);
 

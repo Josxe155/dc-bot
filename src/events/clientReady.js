@@ -35,7 +35,7 @@ module.exports = {
           type: ActivityType.Watching
         },
         {
-          name: `🎧 /help`,
+          name: `🎧 Bot Oficial`,
           type: ActivityType.Listening
         }
       ];
