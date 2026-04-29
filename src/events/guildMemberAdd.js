@@ -44,7 +44,7 @@ module.exports = {
     inline: false
   }
 )
-        .setFooter({ text: `Ya somos ${member.guild.memberCount}!` })
+        .setFooter({ text: `Ya somos ${member.guild.memberCount} miembros👥!` })
         .setTimestamp();
 
       await channel.send({
