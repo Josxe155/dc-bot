@@ -11,15 +11,18 @@ module.exports = {
       if (!channel) return;
 
       // 🎭 AUTO ROL
-      const roleId = '1494120328048410630';
-      const role = await member.guild.roles.fetch(roleId);
+const roleId = '1494120328048410630'; // usuarios
+const botRoleId = '1494120328048410629'; // bots
 
-      if (!role) {
-        console.log('❌ Rol no encontrado');
-      } else {
-        await member.roles.add(role);
-        console.log(`✅ Rol dado a ${member.user.tag}`);
-      }
+const targetRoleId = member.user.bot ? botRoleId : roleId;
+const role = await member.guild.roles.fetch(targetRoleId);
+
+if (!role) {
+  console.log('❌ Rol no encontrado');
+} else {
+  await member.roles.add(role);
+  console.log(`✅ Rol dado a ${member.user.tag}`);
+}
 
       // 🎨 EMBED
       const embed = new EmbedBuilder()
