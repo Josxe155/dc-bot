@@ -1,3 +1,5 @@
+process.env.FFMPEG_PATH = require('ffmpeg-static');
+
 const { Events, ChannelType } = require('discord.js');
 const {
   joinVoiceChannel,
@@ -5,85 +7,116 @@ const {
   createAudioResource,
   AudioPlayerStatus,
   VoiceConnectionStatus,
-  entersState
+  entersState,
+  StreamType
 } = require('@discordjs/voice');
 
 const play = require('play-dl');
+const prism = require('prism-media');
 
 // 🔥 CONFIG
-const CHANNEL_ID = "1494120329810022531";
-const YOUTUBE_URL = "https://www.youtube.com/live/mKCieTImjvU";
+const CHANNEL_ID = "1498877260592054312";
+const YOUTUBE_URL = "https://www.youtube.com/watch?v=jfKfPfyJRdk";
 
 module.exports = {
   name: Events.ClientReady,
   once: true,
 
   async execute(client) {
-    console.log("🎧 Sistema AFK 24/7 iniciado");
+    console.log("🎧 AFK 24/7 iniciado");
 
     let connection;
     const player = createAudioPlayer();
 
     async function connect() {
-      const channel = await client.channels.fetch(CHANNEL_ID);
+      try {
+        const channel = await client.channels.fetch(CHANNEL_ID);
 
-      if (!channel || channel.type !== ChannelType.GuildVoice) {
-        console.log("❌ Canal inválido");
-        return;
-      }
+        // 🔍 DEBUG
+        console.log("Canal encontrado:", channel?.id, "Tipo:", channel?.type);
 
-      connection = joinVoiceChannel({
-        channelId: channel.id,
-        guildId: channel.guild.id,
-        adapterCreator: channel.guild.voiceAdapterCreator,
-        selfDeaf: true
-      });
-
-      console.log("🔊 Conectado al canal AFK");
-
-      // 🔁 Reconexión si se cae
-      connection.on(VoiceConnectionStatus.Disconnected, async () => {
-        console.log("⚠️ Desconectado, intentando reconectar...");
-
-        try {
-          await Promise.race([
-            entersState(connection, VoiceConnectionStatus.Signalling, 5000),
-            entersState(connection, VoiceConnectionStatus.Connecting, 5000),
-          ]);
-
-          console.log("🔁 Reconectado correctamente");
-        } catch {
-          console.log("❌ No se pudo reconectar, reiniciando conexión...");
-          connect();
+        if (!channel || channel.type !== ChannelType.GuildVoice) {
+          console.log("❌ Canal inválido (no es de voz o no existe)");
+          return;
         }
-      });
 
-      connection.subscribe(player);
+        connection = joinVoiceChannel({
+          channelId: channel.id,
+          guildId: channel.guild.id,
+          adapterCreator: channel.guild.voiceAdapterCreator,
+          selfDeaf: true
+        });
+
+        await entersState(connection, VoiceConnectionStatus.Ready, 15000);
+
+        console.log("🔊 Conectado correctamente");
+        connection.subscribe(player);
+
+        // 🔁 Reconexión sólida
+        connection.on(VoiceConnectionStatus.Disconnected, async () => {
+          console.log("⚠️ Desconectado...");
+
+          try {
+            await entersState(connection, VoiceConnectionStatus.Connecting, 5000);
+          } catch {
+            console.log("🔁 Reconectando desde cero...");
+            connection.destroy();
+            setTimeout(connect, 3000);
+          }
+        });
+
+      } catch (err) {
+        console.log("❌ Error al conectar:", err.message);
+        setTimeout(connect, 5000);
+      }
     }
 
     async function playLive() {
       try {
-        const stream = await play.stream(YOUTUBE_URL);
-
-        const resource = createAudioResource(stream.stream, {
-          inputType: stream.type,
+        // 🔥 MÉTODO MÁS ESTABLE
+        const stream = await play.stream(YOUTUBE_URL, {
+          quality: 2
         });
 
+        const ffmpeg = new prism.FFmpeg({
+          args: [
+            '-reconnect', '1',
+            '-reconnect_streamed', '1',
+            '-reconnect_delay_max', '5',
+            '-i', stream.stream,
+            '-f', 's16le',
+            '-ar', '48000',
+            '-ac', '2'
+          ]
+        });
+
+        const resource = createAudioResource(ffmpeg, {
+          inputType: StreamType.Raw,
+          inlineVolume: true
+        });
+
+        resource.volume.setVolume(0.7);
+
         player.play(resource);
-        console.log("🎧 Reproduciendo live...");
+
+        console.log("🎧 Reproduciendo 24/7 OK");
       } catch (err) {
-        console.log("❌ Error en stream, reintentando...");
-        setTimeout(playLive, 5000);
+        console.log("❌ Error stream:", err.message);
+        setTimeout(playLive, 7000);
       }
     }
 
-    // 🔁 Si el stream se detiene
     player.on(AudioPlayerStatus.Idle, () => {
-      console.log("🔄 Stream detenido, reiniciando...");
+      console.log("🔄 Reiniciando stream...");
       setTimeout(playLive, 3000);
     });
 
-    // 🚀 INICIO
+    player.on('error', (err) => {
+      console.log("❌ Player error:", err.message);
+      setTimeout(playLive, 5000);
+    });
+
+    // 🚀 START
     await connect();
     await playLive();
   }
