@@ -5,26 +5,48 @@ module.exports = {
 
   async execute(member) {
     try {
-      // 📌 Canal de bienvenida (pon tu ID)
       const channelId = '1494120329084276871';
       const channel = await member.guild.channels.fetch(channelId);
 
       if (!channel) return;
 
-      // 🎨 Crear embed
+      // 🎭 AUTO ROL
+      const roleId = '1494120328048410630';
+      const role = await member.guild.roles.fetch(roleId);
+
+      if (!role) {
+        console.log('❌ Rol no encontrado');
+      } else {
+        await member.roles.add(role);
+        console.log(`✅ Rol dado a ${member.user.tag}`);
+      }
+
+      // 🎨 EMBED
       const embed = new EmbedBuilder()
         .setTitle('🎉 Nuevo miembro!')
         .setDescription(`👋 Bienvenido ${member} a **${member.guild.name}**`)
         .setColor('#00C3FF')
         .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
         .addFields(
-          { name: '📜 Reglas', value: 'Lee <#1494120329084276872>', inline: true },
-          { name: '💬 Chat', value: 'Habla en <#1494120329252179986>', inline: true }
-        )
-        .setFooter({ text: `Miembro #${member.guild.memberCount}` })
+  {
+    name: '📜・Reglas',
+    value: 'Revisa <#1494120329084276872> para evitar sanciones ⚠️',
+    inline: true
+  },
+  {
+    name: '💬・Chat',
+    value: 'Únete a la conversación en <#1494120329252179986> 🗨️',
+    inline: true
+  },
+  {
+    name: '🎮・Servidor Minecraft',
+    value: 'Tenemos servidor **Java & Bedrock 24/7** 🚀\nConéctate aquí: <#1496325402514428025>',
+    inline: false
+  }
+)
+        .setFooter({ text: `Ya somos ${member.guild.memberCount}!` })
         .setTimestamp();
 
-      // 🚀 Enviar mensaje
       await channel.send({
         content: `✨ Bienvenido ${member}`,
         embeds: [embed]
