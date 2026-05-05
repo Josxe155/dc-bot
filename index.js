@@ -1,7 +1,6 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const birthdayService = require('./src/services/birthdayChecker');
 const { Client, GatewayIntentBits, Partials, Collection } = require('discord.js');
 
 // =========================
@@ -155,11 +154,6 @@ const init = async () => {
   }
 };
 
-// 🎂 ACTIVAR SERVICIO DE CUMPLEAÑOS
-birthdayService(client);
-
-init();
-
 // =========================
 // 🧯 ERRORES GLOBALES
 // =========================
@@ -187,3 +181,8 @@ client.on('warn', (warn) => {
   key: process.env.FIREBASE_PRIVATE_KEY ? "OK" : "MISSING"
 });
 });
+
+// =========================
+// 🚀 START BOT
+// =========================
+init();
