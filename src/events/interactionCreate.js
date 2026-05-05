@@ -32,25 +32,23 @@ module.exports = {
       console.error(`💥 Error en /${commandName}:`, error);
 
       // 🧠 Manejo inteligente de respuestas
-      try {
-        if (interaction.deferred) {
-          await interaction.editReply({
-            content: '❌ Error ejecutando el comando'
-          });
-        } else if (interaction.replied) {
-          await interaction.followUp({
-            content: '❌ Error ejecutando el comando',
-            flags: 64 // 👈 reemplazo moderno de ephemeral
-          });
-        } else {
-          await interaction.reply({
-            content: '❌ Error ejecutando el comando',
-            flags: 64
-          });
-        }
-      } catch (replyError) {
-        console.error('❌ Error enviando respuesta de error:', replyError);
-      }
+try {
+  const payload = {
+    content: '❌ Error ejecutando el comando',
+    ephemeral: true
+  };
+
+  if (interaction.deferred) {
+    await interaction.editReply(payload);
+  } else if (interaction.replied) {
+    await interaction.followUp(payload);
+  } else {
+    await interaction.reply(payload);
+  }
+
+} catch (replyError) {
+  console.error('❌ Error enviando respuesta de error:', replyError);
+}
     }
   }
 };
