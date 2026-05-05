@@ -35,11 +35,20 @@ function initFirebase() {
 initFirebase();
 
 // =========================
-// ✅ SOLO RTDB
+// ⚡ DATABASES
 // =========================
+
+// 🟢 Realtime Database (RTDB)
 const rtdb = admin.database();
 
+// 🔵 Firestore (NUEVO)
+const db = admin.firestore();
+
+// =========================
+// 📦 EXPORTS
+// =========================
 module.exports = {
   admin,
-  rtdb
+  rtdb,
+  db
 };
