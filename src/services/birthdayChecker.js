@@ -1,4 +1,4 @@
-const { rtdb } = require('../config/firebase');
+const db = require('../config/firebase');
 const { EmbedBuilder } = require('discord.js');
 const fs = require('fs');
 const { textToSpeech } = require('../modules/ai/tts');

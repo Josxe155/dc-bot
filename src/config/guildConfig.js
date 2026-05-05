@@ -1,4 +1,4 @@
-const { rtdb } = require('./firebase');
+const db = require('./firebase');
 
 const cache = new Map();
 
