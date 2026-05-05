@@ -1,12 +1,76 @@
-const { getConfig } = require('../config/guildConfig');
+const filters = [
+  require('./filters/spam'),
+  require('./filters/caps'),
+  require('./filters/links'),
+  require('./filters/mentions'),
+  require('./filters/repetition')
+];
 
-module.exports = async (message) => {
-  if (!message.guild) return;
+const scorer = require('./scorer');
+const actions = require('./actions');
+const rules = require('./rules/configRules');
+const logger = require('./utils/logger');
 
-  const config = await getConfig(message.guild.id);
+module.exports = async (message, config) => {
+  try {
+    // 🛑 seguridad básica
+    if (!message || !message.author) return;
+    if (message.author.bot) return;
 
-  if (config.automod.spam.enabled) await spam(message, config);
-  if (config.automod.caps.enabled) await caps(message, config);
-  if (config.automod.links.enabled) await links(message, config);
-  if (config.automod.mentions.enabled) await mentions(message, config);
+    const results = [];
+
+    // ----------------------------
+    // 🧩 PIPELINE DE FILTROS
+    // ----------------------------
+    for (const filter of filters) {
+      try {
+        const res = await filter(message, config); // ✔ soporta async
+        if (res) results.push(res);
+      } catch (err) {
+        console.error(`[AUTOMOD FILTER ERROR]:`, err);
+      }
+    }
+
+    // ----------------------------
+    // 🧠 SCORING ENGINE
+    // ----------------------------
+    let finalScore;
+
+    try {
+      finalScore = scorer(results, config, rules);
+    } catch (err) {
+      console.error(`[SCORER ERROR]:`, err);
+      return;
+    }
+
+    const { decision, reasons = [], score = 0 } = finalScore;
+
+    // ----------------------------
+    // 📊 LOG SYSTEM
+    // ----------------------------
+    try {
+      logger(message, {
+        decision,
+        reasons,
+        score
+      });
+    } catch (err) {
+      console.error(`[LOGGER ERROR]:`, err);
+    }
+
+    // ----------------------------
+    // ⚡ ACTION ENGINE
+    // ----------------------------
+    if (decision && decision !== "ignore") {
+      try {
+        await actions(decision, message, reasons);
+      } catch (err) {
+        console.error(`[ACTION ERROR]:`, err);
+      }
+    }
+
+  } catch (error) {
+    // 🧨 anti-crash global
+    console.error(`[AUTOMOD PIPELINE CRASH]:`, error);
+  }
 };
