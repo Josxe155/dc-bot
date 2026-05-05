@@ -4,55 +4,42 @@ module.exports = (message, config) => {
 
   const words = content.split(/\s+/);
 
-  // 🔥 ignorar mensajes muy cortos
-  if (words.length < 4) return null;
+  let score = 0;
 
-  // ----------------------------
-  // 🔁 1. repetición de palabra
-  // ej: "tu tu tu tu"
-  // ----------------------------
-  const first = words[0].toLowerCase();
-  const allSameWord = words.every(w => w.toLowerCase() === first);
+  // -------------------------
+  // 🔁 repetición de palabra
+  // -------------------------
+  const first = words[0]?.toLowerCase();
+  const allSame = words.length > 3 && words.every(w => w.toLowerCase() === first);
 
-  if (allSameWord) {
-    return {
-      points: 3,
-      reason: "Repetición de palabra detectada"
-    };
-  }
+  if (allSame) score += 3;
 
-  // ----------------------------
-  // 🔁 2. repetición de frase exacta
-  // ej: "hola hola hola hola"
-  // ----------------------------
-  const normalized = content.toLowerCase();
-  const chunks = normalized.split(" ");
-
-  const isRepeatedPhrase =
-    chunks.length >= 6 &&
-    chunks.every(c => c === chunks[0]);
-
-  if (isRepeatedPhrase) {
-    return {
-      points: 3,
-      reason: "Spam de repetición de frase"
-    };
-  }
-
-  // ----------------------------
-  // 🔁 3. repetición de patrón corto
-  // ej: "tu tu tu"
-  // ----------------------------
+  // -------------------------
+  // 🔁 repetición de bloques "tu tu"
+  // -------------------------
   const pattern = words.slice(0, 2).join(" ").toLowerCase();
-  const repeatedPattern = words.join(" ").toLowerCase();
+  const full = content.toLowerCase();
 
-  if (
-    pattern &&
-    repeatedPattern.split(pattern).length > 4
-  ) {
+  if (pattern && full.split(pattern).length > 5) {
+    score += 3;
+  }
+
+  // -------------------------
+  // 📣 mention spam
+  // -------------------------
+  const mentions = (content.match(/<@!?\\d+>/g) || []).length;
+
+  if (mentions >= 5) {
+    score += 4;
+  }
+
+  // -------------------------
+  // ⚡ decisión
+  // -------------------------
+  if (score >= 3) {
     return {
-      points: 2,
-      reason: "Patrón repetitivo detectado"
+      points: score,
+      reason: "Spam combinado (repetición + mentions)"
     };
   }
 
