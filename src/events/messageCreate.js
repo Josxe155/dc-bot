@@ -1,5 +1,6 @@
 const { askNexus } = require('../modules/ai/nexusAI');
 const { textToSpeech } = require('../modules/ai/tts');
+const automod = require('../automod');
 const log = require('../utils/logger');
 const fs = require('fs');
 
