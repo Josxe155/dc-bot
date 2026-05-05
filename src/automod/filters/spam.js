@@ -1,7 +1,7 @@
 const cache = new Map();
 const addStrike = require('../utils/strikes');
 
-module.exports = async (message) => {
+module.exports = async (message, config) => {
   const userId = message.author.id;
 
   if (!cache.has(userId)) {
@@ -13,11 +13,15 @@ module.exports = async (message) => {
 
   timestamps.push(now);
 
-  const recent = timestamps.filter(t => now - t < 5000);
-  cache.set(userId, recent);
+  // ⏱ usar config
+  const interval = config.automod.spam.interval;
+  const max = config.automod.spam.maxMessages;
 
-  if (recent.length > 5) {
+  const filtered = timestamps.filter(t => now - t < interval);
+  cache.set(userId, filtered);
+
+  if (filtered.length >= max) {
     await message.delete().catch(() => {});
-    await addStrike(message, "Spam");
+    await addStrike(message, "Spam detectado");
   }
 };
