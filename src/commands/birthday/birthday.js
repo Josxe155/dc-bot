@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const db = require('./firebase');
+const db = require('../../config/firebase');
 
 function isValidDate(date) {
   // formato DD-MM
