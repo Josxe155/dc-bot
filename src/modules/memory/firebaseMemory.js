@@ -13,7 +13,7 @@ function initFirebase() {
 
 initFirebase();
 
-const db = admin.database();
+const rtdb = admin.database();
 
 // =========================
 // 🧠 OBTENER USUARIO

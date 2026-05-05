@@ -1,4 +1,4 @@
-const db = require('../config/firebase');
+const { rtdb } = require('../config/firebase');
 const { EmbedBuilder } = require('discord.js');
 const fs = require('fs');
 const { textToSpeech } = require('../modules/ai/tts');
@@ -17,7 +17,7 @@ module.exports = (client) => {
     const today = getToday();
 
     try {
-      const snapshot = await db.ref('birthdays').once('value');
+      const snapshot = await rtdb.ref('birthdays').once('value');
       const data = snapshot.val();
 
       if (!data) return;
