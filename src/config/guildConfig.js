@@ -3,31 +3,6 @@ const db = require('./firebase');
 const cache = new Map();
 
 // =========================
-// ⚙️ CONFIG POR DEFECTO
-// =========================
-const DEFAULT_CONFIG = {
-  automod: {
-    caps: {
-      enabled: true,
-      minLength: 8
-    },
-    links: {
-      enabled: true,
-      whitelist: ["youtube.com", "discord.com"]
-    },
-    spam: {
-      enabled: true,
-      maxMessages: 5,
-      interval: 5000
-    },
-    mentions: {
-      enabled: true,
-      max: 4
-    }
-  }
-};
-
-// =========================
 // 🧠 GET CONFIG
 // =========================
 async function getConfig(guildId) {
